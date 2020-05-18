@@ -21,15 +21,23 @@ The core options are as follows. If you export as Excel, each of these will be a
 - Datastores
 - Snapshots
 
-### VMs - Information included :
+
+### VMs - Information included for "Summary" report type :
     VM name
     Powerstate
     CPUs
-    Memory
+    Memory 
     Provisioned space
-    Guest OS full name
+    Guest OS full name 
     Guest Name - guestname at the OS level - requires that VMwareTools be running.
-    IP Address(es) - requires VMwareTools be running. Devices with multiple IPs will report all IPs in a cell, 1 IP per line. If you have VMs with multiple VMs, this can look inelegant.
+
+### VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
+    MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
+    MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
+    CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
+    CPULimit - whether VM has a CPU limit and if so, what size. -1 = no limit.
+    IP Address(es) - requires VMwareTools be running. 
+    Guest OS ID - VMware ID for the OS type   
     VMware Tools status
     VMware Tools version
     CPU hot add - True or False
@@ -39,38 +47,36 @@ The core options are as follows. If you export as Excel, each of these will be a
     Host version number
     Host build number
 
-### ESXi hosts - Information included :
-    Host name
-    Connection state
-    Host uptime in days
-    Vendor
-    Model
-    ESXi version number
-    ESXi build number
-    CPU Model
-    Number sockets
-    Number of cores
-    Total CPU threads
-    Memory 
-    Number of VMs running on the host
-    30 day maximum | minimum | average for CPU and Memory
+### ESXi hosts - Information included for "Summary" report type :
+    Host name 
+    Connection state 
+    Host uptime in days 
+    ESXi version number 
+    Number sockets 
+    Number of cores 
+    Total CPU threads 
+    Memory  
+    Number of VMs running on the host 
+    30 day maximum | minimum | average for CPU and Memory 
 
-### Datastores - Information included :
-    Datastore name
-    NAA
-    Capacity
-    Free space
-    Percentage free - values are rounded up.
+### ESXi hosts - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
+    Vendor 
+    Model  
+    ESXi build number 
+    CPU Model 
 
-### Snapshots - Information included :
-    VM
-    Snapshot name
-    Description
-    Date created
-    Snapshot age
-    Snapshot size
-    Datastore
-    Datastore free space
+### Datastores - Information included for "Summary" report type :
+    Datastore name 
+    Capacity 
+    Free space 
+    Percentage free - values are rounded up. 
+
+### Datastores - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
+    Datastore name 
+    State
+    SIOC - whether enabled or not
+    VMFS version
+    NAA 
 
 ## Credentials required
 An account with the Read-only role is sufficient for this script.
