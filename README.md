@@ -32,10 +32,6 @@ The core options are as follows. If you export as Excel, each of these will be a
     Guest Name - guestname at the OS level - requires that VMwareTools be running.
 
 ### VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
-    MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
-    MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
-    CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
-    CPULimit - whether VM has a CPU limit and if so, what size. -1 = no limit.
     IP Address(es) - requires VMwareTools be running. 
     Guest OS ID - VMware ID for the OS type   
     VMware Tools status
@@ -46,6 +42,17 @@ The core options are as follows. If you export as Excel, each of these will be a
     Host VM is running on
     Host version number
     Host build number
+
+### VM Performance - only produced if "Detailed" report type is selected.
+    MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
+    MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
+    CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
+    CPULimit - whether VM has a CPU limit and if so, what size. -1 = no limit.
+    Ballooning - value for the Summary.QuickStats.BalloonedMemory property
+    30 day CPU Usage (Average), Mhz - derived from cpu.usagemhz.average metric over 30 days with 5 minute interval
+    30 day Memory Usage (Average), % - derived from memory.usagemhz.average metric over 30 days with 5 minute interval
+    30 day Network Usage (Average), KBps - derived from network.usagemhz.average metric over 30 days with 5 minute interval
+    30 day Disk Usage (Average), KBps - derived from disk.usagemhz.average metric over 30 days with 5 minute interval
 
 ### ESXi hosts - Information included for "Summary" report type :
     Host name 

@@ -90,10 +90,6 @@ function Get-EnvironmentReport {
             Guest Name - guestname at the OS level - requires that VMwareTools be running.
 
          VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
-            MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
-            MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
-            CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
-            CPULimit - whether VM has a CPU limit and if so, what size. -1 = no limit.
             IP Address(es) - requires VMwareTools be running. 
             Guest OS ID - VMware ID for the OS type   
             VMware Tools status
@@ -104,6 +100,17 @@ function Get-EnvironmentReport {
             Host VM is running on
             Host version number
             Host build number
+
+        VM Performance - only produced if "Detailed" report type is selected.
+            MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
+            MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
+            CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
+            CPULimit - whether VM has a CPU limit and if so, what size. -1 = no limit.
+            Ballooning - value for the Summary.QuickStats.BalloonedMemory property
+            30 day CPU Usage (Average), Mhz - derived from cpu.usagemhz.average metric over 30 days with 5 minute interval
+            30 day Memory Usage (Average), % - derived from memory.usagemhz.average metric over 30 days with 5 minute interval
+            30 day Network Usage (Average), KBps - derived from network.usagemhz.average metric over 30 days with 5 minute interval
+            30 day Disk Usage (Average), KBps - derived from disk.usagemhz.average metric over 30 days with 5 minute interval
 
          ESXi hosts - Information included for "Summary" report type :
             Host name 
@@ -225,7 +232,7 @@ function Get-EnvironmentReport {
     If ($OutputFormat -eq "Excel") {
         $ExcelAvailable = Test-ForImportExcel
         If (-not $ExcelAvailable) {
-            Write-Host "ImportExcel appears to note be available. Switching output format to .csv" -ForegroundColor Green
+            Write-Host "ImportExcel appears to not be available. Switching output format to .csv" -ForegroundColor Green
             $OutputFormat = "CSV"
         }
     }
@@ -240,6 +247,7 @@ function Get-EnvironmentReport {
     # If more is needed, eg, VC, then add an appropriate collection definition here.
     # The data presented in these will end up as a separate worksheet in the final .xlsx file
     $VMCollection = @()
+    $VMPerfCollection = @()
     $ESXiCollection = @()
     $datastoreCollection = @()
     $snapshotCollection = @()
@@ -249,7 +257,8 @@ function Get-EnvironmentReport {
         Write-Host "Connecting to vCenter $vCenter`n" -ForegroundColor Green
         Try {
             Connect-VIServer $vCenter -ErrorAction Stop
-        } Catch {
+        }
+        Catch {
             Write-Host "Unable to connect to the vCenter"
             Read-Host "Press ENTER to exit"
             Exit
@@ -273,8 +282,7 @@ function Get-EnvironmentReport {
                         FreeSpaceGB    = $DSDetails.FreeSpace
                         PercentageFree = $DSDetails.PercentFree
                     }
-                }
-                else {
+                } else {
                     $info = [PSCustomObject]@{
                         vCenter        = $VCNAme
                         DatastoreName  = $DSDetails.name
@@ -338,32 +346,32 @@ function Get-EnvironmentReport {
                         "30 days Min Mem" = $hoststat.MemMin
                         "30 days Avg Mem" = $hoststat.MemAvg
                     }
-                }    else {
-                        $info = [PSCustomObject]@{
-                            vCenter           = $vcName
-                            DC                = $dc.name
-                            Cluster           = $clusterName
-                            Hypervisor        = $ESXiHost.Name
-                            ConnectionState   = $ESXiHost.ConnectionState
-                            "Uptime (days)"   = $hostUptime
-                            Vendor            = $ESXiHost.ExtensionData.Summary.Hardware.Vendor
-                            Model             = $ESXiHost.ExtensionData.Summary.Hardware.Model
-                            Version           = $ESXiHost.Version
-                            Build             = $ESXiHost.Build
-                            CpuModel          = $ESXiHost.ExtensionData.Summary.Hardware.CpuModel
-                            CpuSockets        = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuPkgs
-                            CpuCores          = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuCores
-                            CpuThreads        = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuThreads
-                            MemoryTotalGB     = $ESXiHost.MemoryTotalGB
-                            NumVMs            = $allVMs.Count
-                            "30 days Max CPU" = $hoststat.CPUMax
-                            "30 days Min CPU" = $hoststat.CPUMin
-                            "30 days Avg CPU" = $hoststat.CPUAvg
-                            "30 days Max Mem" = $hoststat.MemMax
-                            "30 days Min Mem" = $hoststat.MemMin
-                            "30 days Avg Mem" = $hoststat.MemAvg
-                        }        
-                    }
+                } else {
+                    $info = [PSCustomObject]@{
+                        vCenter           = $vcName
+                        DC                = $dc.name
+                        Cluster           = $clusterName
+                        Hypervisor        = $ESXiHost.Name
+                        ConnectionState   = $ESXiHost.ConnectionState
+                        "Uptime (days)"   = $hostUptime
+                        Vendor            = $ESXiHost.ExtensionData.Summary.Hardware.Vendor
+                        Model             = $ESXiHost.ExtensionData.Summary.Hardware.Model
+                        Version           = $ESXiHost.Version
+                        Build             = $ESXiHost.Build
+                        CpuModel          = $ESXiHost.ExtensionData.Summary.Hardware.CpuModel
+                        CpuSockets        = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuPkgs
+                        CpuCores          = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuCores
+                        CpuThreads        = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuThreads
+                        MemoryTotalGB     = $ESXiHost.MemoryTotalGB
+                        NumVMs            = $allVMs.Count
+                        "30 days Max CPU" = $hoststat.CPUMax
+                        "30 days Min CPU" = $hoststat.CPUMin
+                        "30 days Avg CPU" = $hoststat.CPUAvg
+                        "30 days Max Mem" = $hoststat.MemMax
+                        "30 days Min Mem" = $hoststat.MemMin
+                        "30 days Avg Mem" = $hoststat.MemAvg
+                    }        
+                }
                 $ESXiCollection += $info
     
                 # Get the information for the VMs worksheet
@@ -373,6 +381,22 @@ function Get-EnvironmentReport {
                     # Later, we will use ExportExcel to wrap the cells and top align the other cells in the worksheet
                     $ipTemp = $vm | Select-Object @{N = "IP Address"; E = { @($_.guest.IPAddress -join "`n") } } # pull all the IPs that VMwareTools will tell us about.
                     $ipList = $ipTemp | Select-Object -ExpandProperty "IP Address" # Drop the property name so we just have the IPs
+
+                    # Calculate 30 day averages for memory, cpu, network and disk metrics, only for VMs powered on - otherwise set value to 0
+                    # If we don't, we'll see lots of errors as it reports that it can't get the metric, and the respective cells in the worksheet
+                    # would be left blank.
+                    If ($vm.powerstate -eq "PoweredOn") {
+                        $vmCPU = [Math]::Round(($vm | Get-Stat -Stat cpu.usagemhz.average -Start (Get-Date).AddDays(-30) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                        $vmMem = [Math]::Round(($vm | Get-Stat -Stat mem.usage.average -Start (Get-Date).AddDays(-30) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                        $vmNet = [Math]::Round(($vm | Get-Stat -Stat net.usage.average -Start (Get-Date).AddDays(-30) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                        $vmDisk = [Math]::Round(($vm | Get-Stat -Stat disk.usage.average -Start (Get-Date).AddDays(-30) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                    }
+                    else {
+                        $vmCPU = 0
+                        $vmMem = 0
+                        $vmNet = 0
+                        $vmDisk = 0
+                    }
 
                     If ($ReportType -eq "Summary") {
 
@@ -389,8 +413,7 @@ function Get-EnvironmentReport {
                             GuestOsFullName    = $vm.ExtensionData.Summary.Guest.GuestFullName
                             GuestName          = $vm.ExtensionData.Guest.Hostname
                         }   
-                    }
-                    else {
+                    } else {
                         $info = [PSCustomObject]@{
                             vCenter               = $VCName
                             DC                    = $dc.name
@@ -399,10 +422,6 @@ function Get-EnvironmentReport {
                             PowerState            = $vm.PowerState
                             NumCpu                = $vm.NumCpu
                             MemoryGB              = $vm.MemoryGB
-                            MemoryReservation     = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Reservation
-                            MemoryLimit           = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Limit
-                            CPUReservation        = $vm.ExtensionData.ResourceConfig.CPUAllocation.Reservation
-                            CPULimit              = $vm.ExtensionData.ResourceConfig.CPUAllocation.Limit
                             ProvisionedSpaceGB    = [Math]::Round($vm.ProvisionedSpaceGB, 2)
                             UsedSpaceGB           = [Math]::Round($vm.UsedSpaceGB, 2) # Used space on the datastore.
                             GuestId               = $vm.ExtensionData.Summary.Guest.GuestId
@@ -418,8 +437,24 @@ function Get-EnvironmentReport {
                             Version               = $ESXiHost.Version
                             Build                 = $ESXiHost.Build    
                         }   
+
+                        # Put VM performance related metrics into a separate custom object, so that we can populate a separate worksheet
+                        $VMPerfInfo = [PSCustomObject]@{
+                            VM                                     = $vm.Name
+                            MemoryReservation                      = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Reservation
+                            MemoryLimit                            = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Limit
+                            CPUReservation                         = $vm.ExtensionData.ResourceConfig.CPUAllocation.Reservation
+                            CPULimit                               = $vm.ExtensionData.ResourceConfig.CPUAllocation.Limit
+                            Ballooning                             = $vm.ExtensionData.Summary.QuickStats.BalloonedMemory
+                            "30 day CPU Usage (Average), Mhz"      = $vmCPU
+                            "30 day Memory Usage (Average), %"     = $vmMem
+                            "30 day Network Usage (Average), KBps" = $vmNet
+                            "30 day Disk Usage (Average), KBps"    = $vmDisk
+                        }  
+
                     } 
-                $VMCollection += $info
+                    $VMCollection += $info
+                    $VMPerfCollection += $VMPerfInfo
                 } # end foreach ($vm in $allVMs)
             } # end foreach ($ESXiHost in $allESXiHosts)
     
@@ -459,13 +494,15 @@ function Get-EnvironmentReport {
                 # wrap the text in the cell - earlier we split the IPs onto newlines.
                 # Also then doing a vertical alignment of the other columns to top - this is my preference.
                 $a = $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize -PassThru
-                $a.workbook.Worksheets["VMs"].Column(18).Style.Wraptext = $true
-                foreach ($c in 1..26) {
+                $a.workbook.Worksheets["VMs"].Column(14).Style.Wraptext = $true
+                foreach ($c in 1..27) {
                     # Set vertical alignment for each column to top. For ease, doing this for columns 1 -> 26. There will be a more "correct" way to do this.
                     $a.workbook.Worksheets["VMs"].Column($c).Style.VerticalAlignment = "Top"
                 }
                 $a.save()
                 $a.dispose()
+                $VMPerfCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Performance" -AutoSize
+
             }
             else {
                 $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize
