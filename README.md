@@ -44,15 +44,19 @@ The core options are as follows. If you export as Excel, each of these will be a
     Host build number
 
 ### VM Performance - only produced if "Detailed" report type is selected.
+    VM Name
+    Powerstate
     MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
     MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
     CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
     CPULimit - whether VM has a CPU limit and if so, what size. -1 = no limit.
     Ballooning - value for the Summary.QuickStats.BalloonedMemory property
-    30 day CPU Usage (Average), Mhz - derived from cpu.usagemhz.average metric over 30 days with 5 minute interval
-    30 day Memory Usage (Average), % - derived from memory.usagemhz.average metric over 30 days with 5 minute interval
-    30 day Network Usage (Average), KBps - derived from network.usagemhz.average metric over 30 days with 5 minute interval
-    30 day Disk Usage (Average), KBps - derived from disk.usagemhz.average metric over 30 days with 5 minute interval
+    Avg CPU Usage (Mhz) - derived from cpu.usagemhz.average metric over 30 days with 5 minute interval
+    Avg Memory Usage (%) - derived from memory.usage.average metric over 30 days with 5 minute interval
+    Avg Network Usage (KBps) - derived from network.usage.average metric over 30 days with 5 minute interval
+    Avg Disk Usage (KBps) - derived from disk.usage.average metric over 30 days with 5 minute interval
+
+You should probably treat this information with caution, given the sample rate and that it presents a single value as a 30 day representation of "performance."
 
 ### ESXi hosts - Information included for "Summary" report type :
     Host name 
