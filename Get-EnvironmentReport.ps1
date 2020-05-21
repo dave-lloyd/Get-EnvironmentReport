@@ -185,11 +185,11 @@ function Get-EnvironmentReport {
 
         .EXAMPLE
          The following example will connect to VC 10.10.10.10 and generate an .xlsx file Named 10.10.10.10-Audit-<date>.xlsx which contains worksheets for VMs, ESXi hosts and Datastores
-         Get-EnvironmentReport -vcs 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details
+         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details
     
         .EXAMPLE
          The following example will connect to VC 10.10.10.10 and generate a series of .csv files, one each containing an audit of VMs, ESXi hosts, Datastores and Snapshots in the environment. 
-         Get-EnvironmentReport -vcs 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots Yes -OutputFormat CSV -ReportType Summary
+         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots Yes -OutputFormat CSV -ReportType Summary
               
         .NOTES
         Author          : Dave Lloyd
@@ -273,6 +273,7 @@ function Get-EnvironmentReport {
         foreach ($dc in $dcs) {
             # Gather the information for the Datastores worksheet              
             If ($Datastores -eq "Yes") {
+                Write-Host "`nProcessing Datastores information in datacenter : $dc." -ForegroundColor Green
                 $allDatastores = Get-Datastore -Location $dc
                 foreach ($ds in $allDatastores) {
                     $DSDetails = $ds | Select-Object name, @{n = "Capacity"; E = { [math]::round($_.CapacityGB) } }, @{n = "FreeSpace"; E = { [math]::round($_.FreeSpaceGB) } }, @{N = "PercentFree"; E = { [math]::round($_.FreeSpaceGB / $_.CapacityGB * 100) } }
@@ -304,7 +305,7 @@ function Get-EnvironmentReport {
 
             # Gather the information for the Hosts worksheet              
             If ($Hosts -eq "Yes") {
-                # Get the information for the ESXi hosts worksheet    
+                Write-Host "`nProcessing Hosts information in datacenter : $dc." -ForegroundColor Green
                 $allESXiHosts = Get-VMHost -Location $dc
                 foreach ($ESXiHost in $allESXiHosts) {                
                     #$allVMs = get-vm -Location $ESXiHost
@@ -384,6 +385,8 @@ function Get-EnvironmentReport {
 
             # Gather the information for the VMs worksheet              
             If ($VMs -eq "Yes") {
+                Write-Host "`nProcessing VMs information in datacenter : $dc." -ForegroundColor Green
+
                 $allVMs = get-vm -Location $dc
                 foreach ($vm in $allVMs) {
 
@@ -472,7 +475,7 @@ function Get-EnvironmentReport {
 
             # Gather the information for the Snapshots worksheet              
             If ($Snapshots -eq "Yes") {
-                # Get the information for the Snapshots worksheet
+                Write-Host "`nProcessing Snapshots information in datacenter : $dc." -ForegroundColor Green
                 foreach ($snap in Get-VM -Location $dc | Get-Snapshot) {
                     $ds = Get-Datastore -VM $snap.vm
                     $SnapshotAge = ((Get-Date) - $snap.Created).Days
