@@ -390,6 +390,9 @@ function Get-EnvironmentReport {
                 $allVMs = get-vm -Location $dc
                 foreach ($vm in $allVMs) {
 
+                    $ESXiHost = $vm | Get-VMHost    
+                    if ($ESXiHost.IsStandalone) { $clusterName = 'Standalone' } else { $clusterName = $ESXiHost.Parent.Name }				
+                    
                     $ClusTemp = $vm | Get-VMHost
                     $clusterName = $ClusTemp.Parent.Name
                     # Grab the IPs listed in the VM - requires VMwareTools be running.
