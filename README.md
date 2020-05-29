@@ -32,6 +32,7 @@ The core options are as follows. If you export as Excel, each of these will be a
     Guest Name - guestname at the OS level - requires that VMwareTools be running.
 
 ### VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
+    Individual Hard Disk sizes (GB) - the size of the individual harddisks as presented to the VM.
     IP Address(es) - requires VMwareTools be running. 
     Guest OS ID - VMware ID for the OS type   
     VMware Tools status

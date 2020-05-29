@@ -16,8 +16,7 @@ Function Test-ForImportExcel {
     If ($CurrentlyAvailableModules) {
         Write-Host "ImportExcel module is available" -ForegroundColor Green
         Return $True
-    }
-    else {
+    } else {
         Return $False
     }
 } # End Check-ForImportExcel
@@ -46,8 +45,7 @@ Function Set-InitializeAudit {
     If (!(Test-Path -Path $Global:EnvironmentReport_home)) {
         Write-Host "Folders not present. Creating." -ForegroundColor Green
         New-Item -ItemType directory -Path $Global:EnvironmentReport_home
-    }
-    else {
+    } else {
         Write-Host "Folder present." -ForegroundColor Green
     }
     
@@ -395,26 +393,38 @@ function Get-EnvironmentReport {
                     
                     $ClusTemp = $vm | Get-VMHost
                     $clusterName = $ClusTemp.Parent.Name
-                    # Grab the IPs listed in the VM - requires VMwareTools be running.
-                    # For those with multiple IPs, split them with `n
-                    # Later, we will use ExportExcel to wrap the cells and top align the other cells in the worksheet
-                    $ipTemp = $vm | Select-Object @{N = "IP Address"; E = { @($_.guest.IPAddress -join "`n") } } # pull all the IPs that VMwareTools will tell us about.
-                    $ipList = $ipTemp | Select-Object -ExpandProperty "IP Address" # Drop the property name so we just have the IPs
 
-                    # Calculate 30 day averages for memory, cpu, network and disk metrics, only for VMs powered on - otherwise set value to 0
-                    # If we don't, we'll see lots of errors as it reports that it can't get the metric, and the respective cells in the worksheet
-                    # would be left blank.
-                    If ($vm.powerstate -eq "PoweredOn") {
-                        $vmCPU = [Math]::Round(($vm | Get-Stat -Stat cpu.usagemhz.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                        $vmMem = [Math]::Round(($vm | Get-Stat -Stat mem.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                        $vmNet = [Math]::Round(($vm | Get-Stat -Stat net.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                        $vmDisk = [Math]::Round(($vm | Get-Stat -Stat disk.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                    } else {
-                        $vmCPU = 0
-                        $vmMem = 0
-                        $vmNet = 0
-                        $vmDisk = 0
-                    } # end If ($vm.powerstate -eq "PoweredOn")
+                    # Collect the following only if $ReportType is detailed
+                    If ($ReportType -eq "Detailed") {
+                        # List the size of individual hard disks
+                        $vmDisks = $vm | Get-HardDisk
+                        $calcDisks = foreach ($disk in $vmDisks) {
+                            "{0} = {1}" -f ($disk.Name), ($disk.CapacityGB)
+                        }
+                        $HardDiskSizes = $calcDisks -join "`n"
+
+                        # Grab the IPs listed in the VM - requires VMwareTools be running.
+                        # For those with multiple IPs, split them with `n
+                        # Later, we will use ExportExcel to wrap the cells and top align the other cells in the worksheet
+                        $ipTemp = $vm | Select-Object @{N = "IP Address"; E = { @($_.guest.IPAddress -join "`n") } } # pull all the IPs that VMwareTools will tell us about.
+                        $ipList = $ipTemp | Select-Object -ExpandProperty "IP Address" # Drop the property name so we just have the IPs
+
+                        # Calculate 30 day averages for memory, cpu, network and disk metrics, only for VMs powered on - otherwise set value to 0
+                        # If we don't, we'll see lots of errors as it reports that it can't get the metric, and the respective cells in the worksheet
+                        # would be left blank.
+                        If ($vm.powerstate -eq "PoweredOn") {
+                            $vmCPU = [Math]::Round(($vm | Get-Stat -Stat cpu.usagemhz.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                            $vmMem = [Math]::Round(($vm | Get-Stat -Stat mem.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                            $vmNet = [Math]::Round(($vm | Get-Stat -Stat net.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                            $vmDisk = [Math]::Round(($vm | Get-Stat -Stat disk.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                        } else {
+                            $vmCPU = 0
+                            $vmMem = 0
+                            $vmNet = 0
+                            $vmDisk = 0
+                        } # end If ($vm.powerstate -eq "PoweredOn")
+
+                    } # end If $ReportType -eq "Detailed"
 
                     If ($ReportType -eq "Summary") {
 
@@ -433,27 +443,28 @@ function Get-EnvironmentReport {
                         } # end $VMinfo = [PSCustomObject]@  
                     } else {
                         $VMinfo = [PSCustomObject]@{
-                            vCenter               = $VCName
-                            DC                    = $dc.name
-                            Cluster               = $clusterName
-                            VM                    = $vm.Name
-                            PowerState            = $vm.PowerState
-                            NumCpu                = $vm.NumCpu
-                            MemoryGB              = $vm.MemoryGB
-                            ProvisionedSpaceGB    = [Math]::Round($vm.ProvisionedSpaceGB, 2)
-                            UsedSpaceGB           = [Math]::Round($vm.UsedSpaceGB, 2) # Used space on the datastore.
-                            GuestId               = $vm.ExtensionData.Summary.Guest.GuestId
-                            GuestOsFullName       = $vm.ExtensionData.Summary.Guest.GuestFullName
-                            GuestName             = $vm.ExtensionData.Guest.Hostname
-                            ToolsStatus           = $vm.ExtensionData.Summary.Guest.ToolsStatus
-                            "IP Address(es)"      = $ipList
-                            ToolsVersion          = $vm.ExtensionData.Config.Tools.ToolsVersion
-                            MemoryHotAdd          = $vm.ExtensionData.Config.MemoryHotAddEnabled
-                            CPUHotAdd             = $vm.ExtensionData.Config.CPUHotAddEnabled
-                            "VM Hardware version" = $vm.ExtensionData.Config.Version
-                            Host                  = $ESXiHost.name
-                            Version               = $ESXiHost.Version
-                            Build                 = $ESXiHost.Build    
+                            vCenter                           = $VCName
+                            DC                                = $dc.name
+                            Cluster                           = $clusterName
+                            VM                                = $vm.Name
+                            PowerState                        = $vm.PowerState
+                            NumCpu                            = $vm.NumCpu
+                            MemoryGB                          = $vm.MemoryGB
+                            ProvisionedSpaceGB                = [Math]::Round($vm.ProvisionedSpaceGB, 2)
+                            UsedSpaceGB                       = [Math]::Round($vm.UsedSpaceGB, 2) # Used space on the datastore.
+                            "Individual Hard Disk sizes (GB)" = $HardDiskSizes
+                            GuestId                           = $vm.ExtensionData.Summary.Guest.GuestId
+                            GuestOsFullName                   = $vm.ExtensionData.Summary.Guest.GuestFullName
+                            GuestName                         = $vm.ExtensionData.Guest.Hostname
+                            ToolsStatus                       = $vm.ExtensionData.Summary.Guest.ToolsStatus
+                            "IP Address(es)"                  = $ipList
+                            ToolsVersion                      = $vm.ExtensionData.Config.Tools.ToolsVersion
+                            MemoryHotAdd                      = $vm.ExtensionData.Config.MemoryHotAddEnabled
+                            CPUHotAdd                         = $vm.ExtensionData.Config.CPUHotAddEnabled
+                            "VM Hardware version"             = $vm.ExtensionData.Config.Version
+                            Host                              = $ESXiHost.name
+                            Version                           = $ESXiHost.Version
+                            Build                             = $ESXiHost.Build    
                         }   
 
                         # Put VM performance related metrics into a separate custom object, so that we can populate a separate worksheet
@@ -516,10 +527,12 @@ function Get-EnvironmentReport {
                 # wrap the text in the cell - earlier we split the IPs onto newlines.
                 # Also then doing a vertical alignment of the other columns to top - this is my preference.
                 $a = $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize -PassThru
-                $a.workbook.Worksheets["VMs"].Column(14).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(10).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(15).Style.Wraptext = $true
                 foreach ($c in 1..27) {
                     # Set vertical alignment for each column to top. For ease, doing this for columns 1 -> 26. There will be a more "correct" way to do this.
                     $a.workbook.Worksheets["VMs"].Column($c).Style.VerticalAlignment = "Top"
+                    $a.workbook.Worksheets["VMs"].Column($c).Style.HorizontalAlignment = "Left"
                 }
                 $a.save()
                 $a.dispose()
