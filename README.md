@@ -34,6 +34,10 @@ The core options are as follows. If you export as Excel, each of these will be a
 ### VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
     Individual Hard Disk sizes (GB) - the size of the individual harddisks as presented to the VM.
     IP Address(es) - requires VMwareTools be running. 
+    MAC Addresses 
+    NIC Connection State
+    NIC Type - ie, vmxnet3 etc
+    Portgroup name 
     Guest OS ID - VMware ID for the OS type   
     VMware Tools status
     VMware Tools version

@@ -409,6 +409,25 @@ function Get-EnvironmentReport {
                         $ipTemp = $vm | Select-Object @{N = "IP Address"; E = { @($_.guest.IPAddress -join "`n") } } # pull all the IPs that VMwareTools will tell us about.
                         $ipList = $ipTemp | Select-Object -ExpandProperty "IP Address" # Drop the property name so we just have the IPs
 
+                        $vmNICS = $vm | Get-NetworkAdapter
+                        $calcMACS = foreach ($nic in $vmNICS) {
+                            "{0} : {1}" -f ($nic.Name), ($nic.MacAddress)
+                        }
+                        $calcNICState = foreach ($nic in $vmNICS) {
+                            "{0} : {1}" -f ($nic.Name), ($nic.ConnectionState.Connected)
+                        }
+                        $calcNICType = foreach ($nic in $vmNICS) {
+                            "{0} : {1}" -f ($nic.Name), ($nic.Type)
+                        }
+                        $calcPG = foreach ($nic in $vmNICS) {
+                            "{0} : {1}" -f ($nic.Name), ($nic.NetworkName)
+                        }
+
+                        $Macs = $calcMACS -join "`n"
+                        $NICState = $calcNICState -join "`n"
+                        $NICType = $calcNICType -join "`n"
+                        $PG = $calcPG -join "`n"
+
                         # Calculate 30 day averages for memory, cpu, network and disk metrics, only for VMs powered on - otherwise set value to 0
                         # If we don't, we'll see lots of errors as it reports that it can't get the metric, and the respective cells in the worksheet
                         # would be left blank.
@@ -458,6 +477,10 @@ function Get-EnvironmentReport {
                             GuestName                         = $vm.ExtensionData.Guest.Hostname
                             ToolsStatus                       = $vm.ExtensionData.Summary.Guest.ToolsStatus
                             "IP Address(es)"                  = $ipList
+                            "MAC Addresses"                   = $Macs
+                            "NIC Connection State"            = $NICState
+                            "NIC Type"                        = $NICType
+                            "Portgroup name"                  = $pg
                             ToolsVersion                      = $vm.ExtensionData.Config.Tools.ToolsVersion
                             MemoryHotAdd                      = $vm.ExtensionData.Config.MemoryHotAddEnabled
                             CPUHotAdd                         = $vm.ExtensionData.Config.CPUHotAddEnabled
@@ -529,6 +552,10 @@ function Get-EnvironmentReport {
                 $a = $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize -PassThru
                 $a.workbook.Worksheets["VMs"].Column(10).Style.Wraptext = $true
                 $a.workbook.Worksheets["VMs"].Column(15).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(16).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(17).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(18).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(19).Style.Wraptext = $true
                 foreach ($c in 1..27) {
                     # Set vertical alignment for each column to top. For ease, doing this for columns 1 -> 26. There will be a more "correct" way to do this.
                     $a.workbook.Worksheets["VMs"].Column($c).Style.VerticalAlignment = "Top"
@@ -565,7 +592,7 @@ function Get-EnvironmentReport {
             If ($ReportType -eq "Detailed") {
                 $vmperf_csv = "$script_dir\$VCName-VMPerf-Audit-$date.csv" 
                 $VMPerfCollection | Export-CSV -NoTypeInformation -Path $VMPerf_csv
-                Write-Host "VM audit : $vm_csv" -ForegroundColor Green                    
+                Write-Host "VM performance audit : $vmPerf_csv" -ForegroundColor Green                    
             }
         }
         If ($Hosts -eq "Yes") { 
