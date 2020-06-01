@@ -89,6 +89,10 @@ function Get-EnvironmentReport {
 
          VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
             IP Address(es) - requires VMwareTools be running. 
+            MAC Addresses 
+            NIC Connection State
+            NIC Type - ie, vmxnet3 etc
+            Portgroup name 
             Guest OS ID - VMware ID for the OS type   
             VMware Tools status
             VMware Tools version
@@ -305,9 +309,9 @@ function Get-EnvironmentReport {
             If ($Hosts -eq "Yes") {
                 Write-Host "`nProcessing Hosts information in datacenter : $dc." -ForegroundColor Green
                 $allESXiHosts = Get-VMHost -Location $dc
-                foreach ($ESXiHost in $allESXiHosts) {                
-                    #$allVMs = get-vm -Location $ESXiHost
-                        
+
+                foreach ($ESXiHost in $allESXiHosts) {                                        
+                    $VMsPerHost = $ESXiHost | Get-VM
                     if ($ESXiHost.IsStandalone) { $clusterName = 'Standalone' } else { $clusterName = $ESXiHost.Parent.Name }				
                         
                     # Calculate the host maximum, minimum, and average CPU and memory usage over the last 30 days ($TP variable)
@@ -368,7 +372,7 @@ function Get-EnvironmentReport {
                             CpuCores          = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuCores
                             CpuThreads        = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuThreads
                             MemoryTotalGB     = $ESXiHost.MemoryTotalGB
-                            NumVMs            = $allVMs.Count
+                            NumVMs            = $VMsPerHost.Count
                             "30 days Max CPU" = $hoststat.CPUMax
                             "30 days Min CPU" = $hoststat.CPUMin
                             "30 days Avg CPU" = $hoststat.CPUAvg
@@ -409,23 +413,28 @@ function Get-EnvironmentReport {
                         $ipTemp = $vm | Select-Object @{N = "IP Address"; E = { @($_.guest.IPAddress -join "`n") } } # pull all the IPs that VMwareTools will tell us about.
                         $ipList = $ipTemp | Select-Object -ExpandProperty "IP Address" # Drop the property name so we just have the IPs
 
+                        # Get network adapter properties for MAC, connection state, type and the connected portgroup
+                        # This will go into 4 cells per VM. Where there are multiple entries for a VM per cell
+                        # they will be split into seperate lines within the cell
                         $vmNICS = $vm | Get-NetworkAdapter
                         $calcMACS = foreach ($nic in $vmNICS) {
                             "{0} : {1}" -f ($nic.Name), ($nic.MacAddress)
                         }
+                        $Macs = $calcMACS -join "`n"
+
                         $calcNICState = foreach ($nic in $vmNICS) {
                             "{0} : {1}" -f ($nic.Name), ($nic.ConnectionState.Connected)
                         }
+                        $NICState = $calcNICState -join "`n"
+
                         $calcNICType = foreach ($nic in $vmNICS) {
                             "{0} : {1}" -f ($nic.Name), ($nic.Type)
                         }
+                        $NICType = $calcNICType -join "`n"
+
                         $calcPG = foreach ($nic in $vmNICS) {
                             "{0} : {1}" -f ($nic.Name), ($nic.NetworkName)
                         }
-
-                        $Macs = $calcMACS -join "`n"
-                        $NICState = $calcNICState -join "`n"
-                        $NICType = $calcNICType -join "`n"
                         $PG = $calcPG -join "`n"
 
                         # Calculate 30 day averages for memory, cpu, network and disk metrics, only for VMs powered on - otherwise set value to 0
