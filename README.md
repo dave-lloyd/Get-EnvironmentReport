@@ -48,7 +48,7 @@ The core options are as follows. If you export as Excel, each of these will be a
     Host version number
     Host build number
 
-### VM Performance - only produced if "Detailed" report type is selected.
+### VM Performance - only produced if "Detailed" report type is selected :
     VM Name
     Powerstate
     MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
@@ -81,6 +81,13 @@ You should probably treat this information with caution, given the sample rate a
     ESXi build number 
     CPU Model 
 
+### ESXi NICs - Information included only if hosts AND "detailed" report type are selected :
+    Host
+    NIC Name
+    Description
+    Link status
+    Link Speed
+    
 ### Datastores - Information included for "Summary" report type :
     Datastore name 
     Capacity 

@@ -253,6 +253,7 @@ function Get-EnvironmentReport {
     $VMCollection = @()
     $VMPerfCollection = @()
     $ESXiCollection = @()
+    $ESXiNICCollection = @()
     $datastoreCollection = @()
     $snapshotCollection = @()
                 
@@ -310,7 +311,8 @@ function Get-EnvironmentReport {
                 Write-Host "`nProcessing Hosts information in datacenter : $dc." -ForegroundColor Green
                 $allESXiHosts = Get-VMHost -Location $dc
 
-                foreach ($ESXiHost in $allESXiHosts) {                                        
+                foreach ($ESXiHost in $allESXiHosts) {        
+
                     $VMsPerHost = $ESXiHost | Get-VM
                     if ($ESXiHost.IsStandalone) { $clusterName = 'Standalone' } else { $clusterName = $ESXiHost.Parent.Name }				
                         
@@ -360,7 +362,7 @@ function Get-EnvironmentReport {
                             vCenter           = $vcName
                             DC                = $dc.name
                             Cluster           = $clusterName
-                            Hypervisor        = $ESXiHost.Name
+                            Host              = $ESXiHost.Name
                             ConnectionState   = $ESXiHost.ConnectionState
                             "Uptime (days)"   = $hostUptime
                             Vendor            = $ESXiHost.ExtensionData.Summary.Hardware.Vendor
@@ -379,9 +381,24 @@ function Get-EnvironmentReport {
                             "30 days Max Mem" = $hoststat.MemMax
                             "30 days Min Mem" = $hoststat.MemMin
                             "30 days Avg Mem" = $hoststat.MemAvg
-                        } # end $ESXinfo = [PSCustomObject]@       
+                        } # end $ESXinfo = [PSCustomObject]@     
+                        
+                        # Gather host NIC details and we'll populate in a separate worksheet
+                        $HostNICDetails = (Get-ESXcli -VMHost $ESXiHost).network.nic.list()
+                        foreach ($HostNic in $HostNICDetails) {
+                            $ESXiNICInfo = [PSCustomObject]@{
+                                Host          = $ESXiHost.Name
+                                "NIC Name"    = $HostNIC.Name
+                                Description   = $HostNIC.Description
+                                "Link status" = $HostNIC.Link
+                                "Link Speed"  = $HostNIC.Speed
+                            }
+                            $ESXINICCollection += $ESXiNICInfo                                 
+                        } # End foreach ($HostNic in $HostNICDetails)
+
                     } # end If (ReportType -eq "Summary")
                     $ESXiCollection += $ESXinfo
+
                 } # end foreach ($ESXiHost in $allESXiHosts)
             } # end If ($Hosts -eq "Yes")
 
@@ -580,7 +597,12 @@ function Get-EnvironmentReport {
         }
 
         If ($Hosts -eq "Yes") { 
-            $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize 
+            If ($ReportType -eq "Detailed") {
+                $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize             
+                $ESXiNICCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi NICs" -AutoSize     
+            } else {
+                $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize             
+            }
         }
 
         If ($Datastores -eq "Yes") { 
