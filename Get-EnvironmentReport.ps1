@@ -103,7 +103,7 @@ function Get-EnvironmentReport {
             Host version number
             Host build number
 
-        VM Performance - only produced if "Detailed" report type is selected.
+        VM Performance - only produced if "Detailed" report type is selected :
             MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
             MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
             CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
@@ -133,6 +133,13 @@ function Get-EnvironmentReport {
             Model  
             ESXi build number 
             CPU Model 
+
+         ESXi NICs - Information included only if hosts AND "detailed" report type are selected :
+            Host
+            NIC Name
+            Description
+            Link status
+            Link Speed
 
          Datastores - Information included for "Summary" report type :
             Datastore name 
