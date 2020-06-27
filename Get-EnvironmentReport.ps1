@@ -649,7 +649,11 @@ function Get-EnvironmentReport {
             If ($ReportType -eq "Detailed") {
                 $vmperf_csv = "$script_dir\$VCName-VMPerf-Audit-$date.csv" 
                 $VMPerfCollection | Export-CSV -NoTypeInformation -Path $VMPerf_csv
-                Write-Host "VM performance audit : $vmPerf_csv" -ForegroundColor Green                    
+                Write-Host "VM performance audit : $vmPerf_csv" -ForegroundColor Green  
+                $vmDisks_csv = "$script_dir\$VCName-VMDisks-Audit-$date.csv" 
+                $vmHardDiskCollection | Export-CSV -NoTypeInformation -Path $VMDisks_csv
+                Write-Host "VM disks audit : $vmDisks_csv" -ForegroundColor Green  
+
             }
         }
         If ($Hosts -eq "Yes") { 
