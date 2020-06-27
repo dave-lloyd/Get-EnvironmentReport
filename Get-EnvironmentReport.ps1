@@ -116,6 +116,12 @@ function Get-EnvironmentReport {
 
             This information should probably be treated with caution, due to the sample frequency, and it simply being a single value representing the average over 30 days. Detailed performance information really needs something more thorough, such as vROPS.
 
+        VM Disks - only produced if "Detailed" report type is selected :
+            VM 
+            HardDisk 
+            Datastore 
+            Size in GB
+
          ESXi hosts - Information included for "Summary" report type :
             Host name 
             Connection state 
@@ -257,13 +263,14 @@ function Get-EnvironmentReport {
     # Collections for each of the elements we are collecting for - Datacenter, hosts, VMs, datastores and VCs. 
     # If more is needed, eg, VC, then add an appropriate collection definition here.
     # The data presented in these will end up as a separate worksheet in the final .xlsx file
-    $VMCollection = @()
-    $VMPerfCollection = @()
-    $ESXiCollection = @()
-    $ESXiNICCollection = @()
-    $datastoreCollection = @()
-    $snapshotCollection = @()
-                
+    $VMCollection = @() # VMs worksheet collection
+    $VMPerfCollection = @() # VM Performance worksheet collection
+    $vmHardDiskCollection = @() # VM Disks worksheet collection
+    $ESXiCollection = @() # Host worksheet collection
+    $ESXiNICCollection = @() # Host NICs worksheet collection
+    $datastoreCollection = @() # Datastores worksheet collection
+    $snapshotCollection = @() # Snapshots worksheet collection
+
     # Now for the work - work against VC 
     foreach ($vc in $vCenter) {
         Write-Host "Connecting to vCenter $vCenter`n" -ForegroundColor Green
@@ -537,6 +544,18 @@ function Get-EnvironmentReport {
                             "Avg Network Usage (KBps)" = $vmNet
                             "Avg Disk Usage (KBps)"    = $vmDisk
                         } # end $VMPerfInfo = [PSCustomObject]@
+
+                        # Create customm object for each harddisk on the VM giving its size and the datastore in which it resides.
+                        # This will all go in the VM disks worksheet
+                        foreach ($hd in $vmdisks) {
+                            $vmHardDiskInfo = [PSCustomObject]@{
+                                VM              = $vm.Name
+                                HardDisk        = $hd.Name
+                                Datastore       = $hd.FileName.Split(']')[0].TrimStart('[')
+                                "Size (GB)"     = $hd.capacityGB 
+                            } # end $vmHardDiskInfo = [PSCustomObject]@
+                            $vmHardDiskCollection += $vmHardDiskInfo
+                        } #end foreach ($hd in $vmdisks)
                     } # end If ($ReportType -eq "Summary")
                     $VMCollection += $VMinfo
                     $VMPerfCollection += $VMPerfInfo
@@ -597,7 +616,7 @@ function Get-EnvironmentReport {
                 $a.save()
                 $a.dispose()
                 $VMPerfCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Performance" -AutoSize
-
+                $vmHardDiskCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Disks" -Autosize
             } else {
                 $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize
             }

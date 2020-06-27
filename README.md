@@ -63,6 +63,12 @@ The core options are as follows. If you export as Excel, each of these will be a
 
 You should probably treat this information with caution, given the sample rate and that it presents a single value as a 30 day representation of "performance."
 
+### VM Disks - only produced if "Detailed" report type is selected :
+    VM 
+    HardDisk 
+    Datastore 
+    Size in GB
+
 ### ESXi hosts - Information included for "Summary" report type :
     Host name 
     Connection state 
@@ -87,7 +93,7 @@ You should probably treat this information with caution, given the sample rate a
     Description
     Link status
     Link Speed
-    
+        
 ### Datastores - Information included for "Summary" report type :
     Datastore name 
     Capacity 
