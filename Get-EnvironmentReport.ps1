@@ -398,7 +398,7 @@ function Get-EnvironmentReport {
                         } # end $ESXinfo = [PSCustomObject]@     
                         
                         # Gather host NIC details and we'll populate in a separate worksheet
-                        $HostNICDetails = (Get-ESXcli -VMHost $ESXiHost).network.nic.list()
+                        $HostNICDetails = (Get-ESXcli -V2 -VMHost $ESXiHost).network.nic.list.Invoke()
                         foreach ($HostNic in $HostNICDetails) {
                             $ESXiNICInfo = [PSCustomObject]@{
                                 Host          = $ESXiHost.Name
