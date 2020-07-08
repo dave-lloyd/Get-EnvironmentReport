@@ -72,6 +72,7 @@ You should probably treat this information with caution, given the sample rate a
 ### ESXi hosts - Information included for "Summary" report type :
     Host name 
     Connection state 
+    Boot time
     Host uptime in days 
     ESXi version number 
     Number sockets 
@@ -90,10 +91,13 @@ You should probably treat this information with caution, given the sample rate a
 ### ESXi NICs - Information included only if hosts AND "detailed" report type are selected :
     Host
     NIC Name
+    MAC Address
     Description
     Link status
     Link Speed
-        
+    Driver Type
+    MTU
+            
 ### Datastores - Information included for "Summary" report type :
     Datastore name 
     Capacity 

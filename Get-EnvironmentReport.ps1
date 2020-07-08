@@ -79,7 +79,7 @@ function Get-EnvironmentReport {
          You can of course choose "Detailed" even for a summary report and just remove a few columns if they are not required.
 
          VMs - Information included for "Summary" report type :
-            VM name
+            VM 
             Powerstate
             CPUs
             Memory 
@@ -123,8 +123,9 @@ function Get-EnvironmentReport {
             Size in GB
 
          ESXi hosts - Information included for "Summary" report type :
-            Host name 
+            Host  
             Connection state 
+            Boot time
             Host uptime in days 
             ESXi version number 
             Number sockets 
@@ -141,11 +142,14 @@ function Get-EnvironmentReport {
             CPU Model 
 
          ESXi NICs - Information included only if hosts AND "detailed" report type are selected :
-            Host
+            Host 
             NIC Name
+            MAC Address
             Description
             Link status
             Link Speed
+            Driver Type
+            MTU
 
          Datastores - Information included for "Summary" report type :
             Datastore name 
@@ -357,6 +361,7 @@ function Get-EnvironmentReport {
                             Cluster           = $clusterName
                             Hypervisor        = $ESXiHost.Name
                             ConnectionState   = $ESXiHost.ConnectionState
+                            "Boot Time"       = $ESXiHost.ExtensionData.Summary.Runtime.BootTime
                             "Uptime (days)"   = $hostUptime
                             Version           = $ESXiHost.Version
                             CpuSockets        = $ESXiHost.ExtensionData.Summary.Hardware.NumCpuPkgs
@@ -378,6 +383,7 @@ function Get-EnvironmentReport {
                             Cluster           = $clusterName
                             Host              = $ESXiHost.Name
                             ConnectionState   = $ESXiHost.ConnectionState
+                            "Boot Time"       = $ESXiHost.ExtensionData.Summary.Runtime.BootTime
                             "Uptime (days)"   = $hostUptime
                             Vendor            = $ESXiHost.ExtensionData.Summary.Hardware.Vendor
                             Model             = $ESXiHost.ExtensionData.Summary.Hardware.Model
@@ -403,9 +409,13 @@ function Get-EnvironmentReport {
                             $ESXiNICInfo = [PSCustomObject]@{
                                 Host          = $ESXiHost.Name
                                 "NIC Name"    = $HostNIC.Name
+                                "NIC MAC"     = $HostNIC.MACAddress
                                 Description   = $HostNIC.Description
                                 "Link status" = $HostNIC.Link
                                 "Link Speed"  = $HostNIC.Speed
+                                "Driver type" = $HostNIC.Driver
+                                "MTU"         = $HostNIC.mtu 
+
                             }
                             $ESXINICCollection += $ESXiNICInfo                                 
                         } # End foreach ($HostNic in $HostNICDetails)
