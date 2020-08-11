@@ -122,6 +122,15 @@ function Get-EnvironmentReport {
             Datastore 
             Size in GB
 
+         RDMs - only produced if "Detailed" report type is selected :
+            VM Name
+            Disk Name
+            Disk Type
+            NAA
+            VML         
+            Filename   
+            Capacity    
+
          ESXi hosts - Information included for "Summary" report type :
             Host  
             Connection state 
@@ -163,6 +172,7 @@ function Get-EnvironmentReport {
             SIOC - whether enabled or not
             VMFS version
             NAA 
+            ProvisionedGB - view to see if overprovisioned due to thin provisioning.
 
          Snapshots - Information included :
             VM 
@@ -274,6 +284,7 @@ function Get-EnvironmentReport {
     $ESXiNICCollection = @() # Host NICs worksheet collection
     $datastoreCollection = @() # Datastores worksheet collection
     $snapshotCollection = @() # Snapshots worksheet collection
+    $rdmCollection = @() # RDMs worksheet collection
 
     # Now for the work - work against VC 
     foreach ($vc in $vCenter) {
@@ -297,7 +308,12 @@ function Get-EnvironmentReport {
                 Write-Host "`nProcessing Datastores information in datacenter : $dc." -ForegroundColor Green
                 $allDatastores = Get-Datastore -Location $dc
                 foreach ($ds in $allDatastores) {
-                    $DSDetails = $ds | Select-Object name, @{n = "Capacity"; E = { [math]::round($_.CapacityGB) } }, @{n = "FreeSpace"; E = { [math]::round($_.FreeSpaceGB) } }, @{N = "PercentFree"; E = { [math]::round($_.FreeSpaceGB / $_.CapacityGB * 100) } }
+                    $DSDetails = $ds | Select-Object name, 
+                        @{n = "Capacity"; E = { [math]::round($_.CapacityGB) } }, 
+                        @{n = "FreeSpace"; E = { [math]::round($_.FreeSpaceGB) } }, 
+                        @{N = "PercentFree"; E = { [math]::round($_.FreeSpaceGB / $_.CapacityGB * 100) } },
+                        @{n = "ProvisionedGB";E= { [Math]::Round(($_.ExtensionData.Summary.Capacity - $_.ExtensionData.Summary.FreeSpace + $_.ExtensionData.Summary.Uncommitted)/1GB,0) } }
+
             
                     If ($ReportType -eq "Summary") {
                         $DSinfo = [PSCustomObject]@{
@@ -318,6 +334,7 @@ function Get-EnvironmentReport {
                             CapacityGB     = $DSDetails.Capacity
                             FreeSpaceGB    = $DSDetails.FreeSpace
                             PercentageFree = $DSDetails.PercentFree
+                            ProvisionedSpaceGB  = $DSDetails.ProvisionedGB
                         } # end $DSinfo = [PSCustomObject]@
                     } # end If ($ReportType -eq "Summary")
                     $datastoreCollection += $DSinfo       
@@ -493,6 +510,12 @@ function Get-EnvironmentReport {
                             $vmDisk = 0
                         } # end If ($vm.powerstate -eq "PoweredOn")
 
+                        # Gather RDM information    
+                        $rdmList = $vm| Get-HardDisk | Where-Object {$_.DiskType -like "Raw*"} | Select-Object @{N="VM";E={$_.Parent}},
+                            Name, DiskType,
+                            @{N="NAA";E={$_.ScsiCanonicalName}},
+                            @{N="VML";E={$_.DeviceName}},Filename,CapacityGB
+
                     } # end If $ReportType -eq "Detailed"
 
                     If ($ReportType -eq "Summary") {
@@ -567,8 +590,24 @@ function Get-EnvironmentReport {
                             $vmHardDiskCollection += $vmHardDiskInfo
                         } #end foreach ($hd in $vmdisks)
                     } # end If ($ReportType -eq "Summary")
+
+                    # RDM worksheet
+                    ForEach ($rdm in $rdmList) {
+                        $rdmInfo = [PSCustomObject]@{
+                            "VM Name"   = $rdmList.VM
+                            "Disk Name" = $rdmList.Name
+                            "Disk Type" = $rdmList.DiskType
+                            NAA         = $rdmList.Naa
+                            VML         = $rdmList.VML
+                            Filename    = $rdmList.Filename
+                            Capacity    = $rdmList.CapacityGB
+                        }
+                        $rdmCollection += $rdmInfo
+                    }
+
                     $VMCollection += $VMinfo
                     $VMPerfCollection += $VMPerfInfo
+
                 } # end foreach ($vm in $allVMs)
             } # end If ($VMs -eq "Yes")
 
@@ -627,6 +666,7 @@ function Get-EnvironmentReport {
                 $a.dispose()
                 $VMPerfCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Performance" -AutoSize
                 $vmHardDiskCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Disks" -Autosize
+                $rdmCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "RDMs" -Autosize
             } else {
                 $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize
             }

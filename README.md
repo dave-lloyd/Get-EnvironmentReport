@@ -69,6 +69,15 @@ You should probably treat this information with caution, given the sample rate a
     Datastore 
     Size in GB
 
+### RDMs - only produced if "Detailed" report type is selected :
+    VM Name
+    Disk Name
+    Disk Type
+    NAA
+    VML         
+    Filename   
+    Capacity    
+
 ### ESXi hosts - Information included for "Summary" report type :
     Host name 
     Connection state 
@@ -110,6 +119,7 @@ You should probably treat this information with caution, given the sample rate a
     SIOC - whether enabled or not
     VMFS version
     NAA 
+    ProvisionedGB - view to see if overprovisioned due to thin provisioning.
 
 ## Credentials required
 An account with the Read-only role is sufficient for this script.
