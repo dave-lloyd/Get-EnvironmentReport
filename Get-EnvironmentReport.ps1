@@ -594,13 +594,13 @@ function Get-EnvironmentReport {
                     # RDM worksheet
                     ForEach ($rdm in $rdmList) {
                         $rdmInfo = [PSCustomObject]@{
-                            "VM Name"   = $rdmList.VM
-                            "Disk Name" = $rdmList.Name
-                            "Disk Type" = $rdmList.DiskType
-                            NAA         = $rdmList.Naa
-                            VML         = $rdmList.VML
-                            Filename    = $rdmList.Filename
-                            Capacity    = $rdmList.CapacityGB
+                            "VM Name"   = $rdm.VM
+                            "Disk Name" = $rdm.Name
+                            "Disk Type" = $rdm.DiskType
+                            NAA         = $rdm.Naa
+                            VML         = $rdm.VML
+                            Filename    = $rdm.Filename
+                            Capacity    = $rdm.CapacityGB
                         }
                         $rdmCollection += $rdmInfo
                     }
@@ -703,7 +703,9 @@ function Get-EnvironmentReport {
                 $vmDisks_csv = "$script_dir\$VCName-VMDisks-Audit-$date.csv" 
                 $vmHardDiskCollection | Export-CSV -NoTypeInformation -Path $VMDisks_csv
                 Write-Host "VM disks audit : $vmDisks_csv" -ForegroundColor Green  
-
+                $rdm_csv = "$script_dir\$VCName-RDMs-Audit-$date.csv" 
+                $rdmCollection | Export-CSV -NoTypeInformation -Path $rdm_csv
+                Write-Host "RDMs audit : $rdm_csv" -ForegroundColor Green  
             }
         }
         If ($Hosts -eq "Yes") { 
