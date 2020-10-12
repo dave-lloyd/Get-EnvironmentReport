@@ -160,6 +160,19 @@ function Get-EnvironmentReport {
             Driver Type
             MTU
 
+         ESXi vmks - only produced if hosts AND "detailed" report type are selected.
+            Host
+            vmk Name
+            IP
+            Subnet mask
+            MAC
+            Portgroup
+            MTU
+            Management - whether enabled for management purposes - TRUE or FALSE
+            vMotion - whether enabled for vMotion - TRUE or FALSE
+            FT - whether enabled for Fault Tolerance logging - TRUE or FALSE
+            VSAN - whether enabled for VSAN - TRUE or FALSE
+
          Datastores - Information included for "Summary" report type :
             Datastore name 
             Capacity 
@@ -285,6 +298,7 @@ function Get-EnvironmentReport {
     $datastoreCollection = @() # Datastores worksheet collection
     $snapshotCollection = @() # Snapshots worksheet collection
     $rdmCollection = @() # RDMs worksheet collection
+    $vmkCollection = @() # ESXi vmks
 
     # Now for the work - work against VC 
     foreach ($vc in $vCenter) {
@@ -437,6 +451,26 @@ function Get-EnvironmentReport {
                             $ESXINICCollection += $ESXiNICInfo                                 
                         } # End foreach ($HostNic in $HostNICDetails)
 
+                        # Gather vmk info
+                        $hostvmk = Get-VMHostNetworkAdapter -VMHost $ESXiHost | Where-Object {$_.name -like '*vmk*'} -ErrorAction SilentlyContinue
+                        forEach ($vmk in $hostvmk) {
+                            $vmkInfo = [PSCustomObject]@{
+                                Host          = $vmk.VMHost
+                                'vmk Name'    = $vmk.Name
+                                IP            = $vmk.IP
+                                'Subnet mask' = $vmk.subnetMask
+                                MAC           = $vmk.Mac 
+                                'Portgroup'   = $vmk.portgroupname
+                                MTU           = $vmk.mtu 
+                                "Management"  = $vmk.ManagementTrafficEnabled
+                                "vMotion"     = $vmk.vMotionEnabled
+                                "FT"          = $vmk.FaultToleranceLoggingEnabled
+                                "VSAN"        = $vmk.VsanTrafficEnabled
+                            }
+                            $vmkCollection += $vmkInfo
+                        } # end forEach ($vmk in $hostvmk) 
+
+
                     } # end If (ReportType -eq "Summary")
                     $ESXiCollection += $ESXinfo
 
@@ -518,6 +552,10 @@ function Get-EnvironmentReport {
 
                     } # end If $ReportType -eq "Detailed"
 
+                    # Tags
+                    $CustomerID = $vm | Select-Object @{Name="CustomerID";Expression={(Get-TagAssignment -Category "Customer ID" $_).Tag.Name}}
+                    $CustomerName = $vm | Select-Object @{Name="CustomerName";Expression={(Get-TagAssignment -Category "Customer Name" $_).Tag.Name}}
+
                     If ($ReportType -eq "Summary") {
 
                         $VMinfo = [PSCustomObject]@{
@@ -561,6 +599,8 @@ function Get-EnvironmentReport {
                             Host                              = $ESXiHost.name
                             Version                           = $ESXiHost.Version
                             Build                             = $ESXiHost.Build    
+                            "Customer ID"                     = $CustomerID.CustomerID
+                            "Customer Name"                   = $CustomerName.CustomerName
                         }   
 
                         # Put VM performance related metrics into a separate custom object, so that we can populate a separate worksheet
@@ -676,6 +716,7 @@ function Get-EnvironmentReport {
             If ($ReportType -eq "Detailed") {
                 $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize             
                 $ESXiNICCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi NICs" -AutoSize     
+                $vmkCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi vmks" -AutoSize     
             } else {
                 $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize             
             }

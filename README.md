@@ -106,7 +106,20 @@ You should probably treat this information with caution, given the sample rate a
     Link Speed
     Driver Type
     MTU
-            
+
+### ESXi vmks - only produced if hosts AND "detailed" report type are selected.
+    Host
+    vmk Name
+    IP
+    Subnet mask
+    MAC
+    Portgroup
+    MTU
+    Management - whether enabled for management purposes - TRUE or FALSE
+    vMotion - whether enabled for vMotion - TRUE or FALSE
+    FT - whether enabled for Fault Tolerance logging - TRUE or FALSE
+    VSAN - whether enabled for VSAN - TRUE or FALSE
+
 ### Datastores - Information included for "Summary" report type :
     Datastore name 
     Capacity 
