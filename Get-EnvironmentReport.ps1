@@ -306,7 +306,6 @@ function Get-EnvironmentReport {
     $snapshotCollection = @() # Snapshots worksheet collection
     $rdmCollection = @() # RDMs worksheet collection
     $vmkCollection = @() # ESXi vmks
-    $DRSRuleCollection = @() # DRS rule collection
 
     # Now for the work - work against VC 
     foreach ($vc in $vCenter) {
@@ -560,10 +559,6 @@ function Get-EnvironmentReport {
 
                     } # end If $ReportType -eq "Detailed"
 
-                    # Tags
-                    $CustomerID = $vm | Select-Object @{Name="CustomerID";Expression={(Get-TagAssignment -Category "Customer ID" $_).Tag.Name}}
-                    $CustomerName = $vm | Select-Object @{Name="CustomerName";Expression={(Get-TagAssignment -Category "Customer Name" $_).Tag.Name}}
-
                     If ($ReportType -eq "Summary") {
 
                         $VMinfo = [PSCustomObject]@{
@@ -657,15 +652,15 @@ function Get-EnvironmentReport {
                     $DRSRules = Get-Cluster | Get-DrsRule
                     $DRSResults = ForEach ($DRSRule in $DRSRules) {
                         "" | Select-Object -Property @{N = "Cluster"; E = { (Get-View -Id $DRSRule.Cluster.Id).Name } },
-                        @{N = "Name"; E = { $DRSRule.Name } },
-                        @{N = "Enabled"; E = { $DRSRule.Enabled } },
-                        @{N = "Rule Type"; E = { $DRSRule.Type } }, 
-                        @{N = "VMs"; E = { $VMIds = $DRSRule.VMIds -split "," 
+                            @{N = "Name"; E = { $DRSRule.Name } },
+                            @{N = "Enabled"; E = { $DRSRule.Enabled } },
+                            @{N = "Rule Type"; E = { $DRSRule.Type } }, 
+                            @{N = "VMs"; E = { $VMIds = $DRSRule.VMIds -split "," 
                                 $VMs = ForEach ($VMId in $VMIds) { 
                                     (Get-View -Id $VMId).Name
                                 } 
                                 $VMs -join "," }
-                        }
+                            }
                     }
            
                     $VMCollection += $VMinfo
