@@ -78,6 +78,14 @@ You should probably treat this information with caution, given the sample rate a
     Filename   
     Capacity    
 
+### DRS Rules - only produced if "Detailed" report type is selected :
+    Cluster
+    Rule Name
+    Enabled - TRUE or FALSE
+    Rule type - affinitiy/anti-affinity
+    VMs
+            
+
 ### ESXi hosts - Information included for "Summary" report type :
     Host name 
     Connection state 
