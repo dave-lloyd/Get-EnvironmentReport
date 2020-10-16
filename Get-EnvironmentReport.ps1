@@ -135,7 +135,7 @@ function Get-EnvironmentReport {
             Cluster
             Rule Name
             Enabled - TRUE or FALSE
-            Rule type - affinitiy/anti-affinity
+            Rule type - affinitiy/anti-affinity/VM host affinity
             VMs
 
          ESXi hosts - Information included for "Summary" report type :
@@ -602,8 +602,6 @@ function Get-EnvironmentReport {
                             Host                              = $ESXiHost.name
                             Version                           = $ESXiHost.Version
                             Build                             = $ESXiHost.Build    
-                            "Customer ID"                     = $CustomerID.CustomerID
-                            "Customer Name"                   = $CustomerName.CustomerName
                         }   
 
                         # Put VM performance related metrics into a separate custom object, so that we can populate a separate worksheet
@@ -649,10 +647,27 @@ function Get-EnvironmentReport {
                     }
 
                     # Based on code from somewhere - not sure where now to attribute to.
-                    $DRSRules = Get-Cluster | Get-DrsRule
-                    $DRSResults = ForEach ($DRSRule in $DRSRules) {
+                    # 2 sets = VM affinitiy/anti-affinity rules and VM to host affinity
+                    # First, the VM affinity / anti-affinity
+                    $DRSRules1 = Get-Cluster | Get-DrsRule
+                    $VMAffinityDRSRules = ForEach ($DRSRule in $DRSRules1) {
                         "" | Select-Object -Property @{N = "Cluster"; E = { (Get-View -Id $DRSRule.Cluster.Id).Name } },
-                            @{N = "Name"; E = { $DRSRule.Name } },
+                            @{N = "Rule Name"; E = { $DRSRule.Name } },
+                            @{N = "Enabled"; E = { $DRSRule.Enabled } },
+                            @{N = "Rule Type"; E = { $DRSRule.Type } }, 
+                            @{N = "VMs"; E = { $VMIds = $DRSRule.VMIds -split "," 
+                                $TVMs = ForEach ($VMId in $VMIds) { 
+                                    (Get-View -Id $VMId).Name
+                                } 
+                                $TVMs -join "," }
+                            }
+    
+                    }
+                    # Now the VM to host affinity
+                    $DRSRules2 = Get-Cluster | Get-DrsRule -Type VMHostAffinity
+                    $VMHostAffinityDRSRules = ForEach ($DRSRule in $DRSRules2) {
+                        "" | Select-Object -Property @{N = "Cluster"; E = { (Get-View -Id $DRSRule.Cluster.Id).Name } },
+                            @{N = "Rule Name"; E = { $DRSRule.Name } },
                             @{N = "Enabled"; E = { $DRSRule.Enabled } },
                             @{N = "Rule Type"; E = { $DRSRule.Type } }, 
                             @{N = "VMs"; E = { $VMIds = $DRSRule.VMIds -split "," 
@@ -661,8 +676,10 @@ function Get-EnvironmentReport {
                                 } 
                                 $VMs -join "," }
                             }
-                    }
-           
+                    } 
+                    # ugh - combine the 2 sets of results 
+                    $AllDRSRules = $VMAffinityDRSRules + $VMHostAffinityDRSRules
+
                     $VMCollection += $VMinfo
                     $VMPerfCollection += $VMPerfInfo
 
@@ -725,7 +742,7 @@ function Get-EnvironmentReport {
                 $VMPerfCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Performance" -AutoSize
                 $vmHardDiskCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Disks" -Autosize
                 $rdmCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "RDMs" -Autosize
-                $DRSResults | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "DRS Rules" -Autosize
+                $AllDRSRules | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "DRS Rules" -Autosize
             } else {
                 $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize
             }

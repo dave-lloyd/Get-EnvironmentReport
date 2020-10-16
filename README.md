@@ -82,7 +82,7 @@ You should probably treat this information with caution, given the sample rate a
     Cluster
     Rule Name
     Enabled - TRUE or FALSE
-    Rule type - affinitiy/anti-affinity
+    Rule type - affinitiy/anti-affinity/VM host affinity
     VMs
             
 
