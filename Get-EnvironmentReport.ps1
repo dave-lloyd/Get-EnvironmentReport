@@ -280,7 +280,7 @@ function Get-EnvironmentReport {
         [ValidateSet('Summary', 'Detailed')] # these are the only valid options
         [string]$ReportType,  
 
-        [Parameter(Mandatory = $True, ParameterSetName = 'ReportType')]
+        [Parameter(Mandatory = $True)]
         [ValidateSet('Yes', 'No')] # these are the only valid options
         [string]$Performance
         
