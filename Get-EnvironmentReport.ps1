@@ -88,6 +88,8 @@ function Get-EnvironmentReport {
             Guest Name - guestname at the OS level - requires that VMwareTools be running.
 
          VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
+            Individual Hard Disk sizes (GB) - the size of the harddisks presented to the VM.
+            Volume/Partition : Capacity : Free - disk usage at the OS level. Requires VMwareTools be running. All volumes/partitions in a single cell.
             IP Address(es) - requires VMwareTools be running. 
             MAC Addresses 
             NIC Connection State
@@ -103,7 +105,7 @@ function Get-EnvironmentReport {
             Host version number
             Host build number
 
-        VM Performance - only produced if "Detailed" report type is selected :
+        VM Performance - only produced if "Detailed" report type is selected AND "Performance" equals Yes. Treat with caution.
             MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
             MemoryLimit - whether VM has a memory limit and if so, what size. -1 = no limit.
             CPUReservation - whether VM has a CPU reservation and if so, what size. No reservation = 0
@@ -199,6 +201,7 @@ function Get-EnvironmentReport {
             Snapshot name 
             Description 
             Date created 
+            Created By - will be marked as "unknown" if unable to find a matching event.
             Snapshot age 
             Snapshot size 
             Datastore 
@@ -231,14 +234,17 @@ function Get-EnvironmentReport {
         .PARAMETER ReportType
          Summary will generate a smaller report, including only the most relevant/requested properties
          Detailed will effectively generate the full report.
-
+        .PARAMETER Performance
+         Whether to include "performance" data and worksheet if VMs are selected. This will increase the time for the script to run not insignificantly.
         .EXAMPLE
-         The following example will connect to VC 10.10.10.10 and generate an .xlsx file Named 10.10.10.10-Audit-<date>.xlsx which contains worksheets for VMs, ESXi hosts and Datastores
-         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details
-    
+         The following example will connect to VC 10.10.10.10 and generate an .xlsx file Named 10.10.10.10-Audit-<date>.xlsx which contains worksheets for VMs and performance, ESXi hosts and Datastores
+         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details -Performance Yes    
+        .EXAMPLE
+         The following example will connect to VC 10.10.10.10 and generate an .xlsx file Named 10.10.10.10-Audit-<date>.xlsx which contains worksheets for VMs with no performance metrics, ESXi hosts and Datastores
+         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details -Performance No    
         .EXAMPLE
          The following example will connect to VC 10.10.10.10 and generate a series of .csv files, one each containing an audit of VMs, ESXi hosts, Datastores and Snapshots in the environment. 
-         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots Yes -OutputFormat CSV -ReportType Summary
+         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots Yes -OutputFormat CSV -ReportType Summary -Performance No
               
         .NOTES
         Author          : Dave Lloyd
@@ -272,8 +278,12 @@ function Get-EnvironmentReport {
 
         [Parameter(Mandatory = $True)]
         [ValidateSet('Summary', 'Detailed')] # these are the only valid options
-        [string]$ReportType  
-       
+        [string]$ReportType,  
+
+        [Parameter(Mandatory = $True, ParameterSetName = 'ReportType')]
+        [ValidateSet('Yes', 'No')] # these are the only valid options
+        [string]$Performance
+        
     )
     
     Set-InitializeAudit
@@ -477,7 +487,6 @@ function Get-EnvironmentReport {
                             $vmkCollection += $vmkInfo
                         } # end forEach ($vmk in $hostvmk) 
 
-
                     } # end If (ReportType -eq "Summary")
                     $ESXiCollection += $ESXinfo
 
@@ -536,20 +545,22 @@ function Get-EnvironmentReport {
                         }
                         $PG = $calcPG -join "`n"
 
-                        # Calculate 30 day averages for memory, cpu, network and disk metrics, only for VMs powered on - otherwise set value to 0
-                        # If we don't, we'll see lots of errors as it reports that it can't get the metric, and the respective cells in the worksheet
-                        # would be left blank.
-                        If ($vm.powerstate -eq "PoweredOn") {
-                            $vmCPU = [Math]::Round(($vm | Get-Stat -Stat cpu.usagemhz.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                            $vmMem = [Math]::Round(($vm | Get-Stat -Stat mem.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                            $vmNet = [Math]::Round(($vm | Get-Stat -Stat net.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                            $vmDisk = [Math]::Round(($vm | Get-Stat -Stat disk.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
-                        } else {
-                            $vmCPU = 0
-                            $vmMem = 0
-                            $vmNet = 0
-                            $vmDisk = 0
-                        } # end If ($vm.powerstate -eq "PoweredOn")
+                        # List the size of the individual hard disks.
+                        # If the VM has more than 1 disk, all disks are shown in a single cell, with each disk on a separate line within that cell.  
+                        $vmDisks = $vm | Get-HardDisk
+                        $calcDisks = foreach ($disk in $vmDisks) {
+                            "{0} = {1}" -f ($disk.Name), ($disk.CapacityGB)
+                        }
+                        $HardDiskSizes = $calcDisks -Join ("`n")
+                        
+                        # Gather OS disk usage if VMwareTools are running
+                        $OSUsage = $VM.Guest.Disks | Select-Object Path, 
+                            @{n="Capacity"; E={[math]::round($_.CapacityGB)}}, 
+                            @{n="FreeSpace"; E={[math]::round($_.FreeSpaceGB)}} 
+                        $OSDisk = foreach ($partition in $OSUsage) {
+                            "{0} Capacity = {1} Free = {2}" -f ($partition.Path), ($partition.Capacity),($partition.FreeSpace)
+                        }
+                        $Partitions = $OSDisk -join "`n"
 
                         # Gather RDM information    
                         $rdmList = $vm| Get-HardDisk | Where-Object {$_.DiskType -like "Raw*"} | Select-Object @{N="VM";E={$_.Parent}},
@@ -576,48 +587,66 @@ function Get-EnvironmentReport {
                         } # end $VMinfo = [PSCustomObject]@  
                     } else {
                         $VMinfo = [PSCustomObject]@{
-                            vCenter                           = $VCName
-                            DC                                = $dc.name
-                            Cluster                           = $clusterName
-                            VM                                = $vm.Name
-                            PowerState                        = $vm.PowerState
-                            NumCpu                            = $vm.NumCpu
-                            MemoryGB                          = $vm.MemoryGB
-                            ProvisionedSpaceGB                = [Math]::Round($vm.ProvisionedSpaceGB, 2)
-                            UsedSpaceGB                       = [Math]::Round($vm.UsedSpaceGB, 2) # Used space on the datastore.
-                            "Individual Hard Disk sizes (GB)" = $HardDiskSizes
-                            GuestId                           = $vm.ExtensionData.Summary.Guest.GuestId
-                            GuestOsFullName                   = $vm.ExtensionData.Summary.Guest.GuestFullName
-                            GuestName                         = $vm.ExtensionData.Guest.Hostname
-                            ToolsStatus                       = $vm.ExtensionData.Summary.Guest.ToolsStatus
-                            "IP Address(es)"                  = $ipList
-                            "MAC Addresses"                   = $Macs
-                            "NIC Connection State"            = $NICState
-                            "NIC Type"                        = $NICType
-                            "Portgroup name"                  = $pg
-                            ToolsVersion                      = $vm.ExtensionData.Config.Tools.ToolsVersion
-                            MemoryHotAdd                      = $vm.ExtensionData.Config.MemoryHotAddEnabled
-                            CPUHotAdd                         = $vm.ExtensionData.Config.CPUHotAddEnabled
-                            "VM Hardware version"             = $vm.ExtensionData.Config.Version
-                            Host                              = $ESXiHost.name
-                            Version                           = $ESXiHost.Version
-                            Build                             = $ESXiHost.Build    
+                            vCenter                              = $VCName
+                            DC                                   = $dc.name
+                            Cluster                              = $clusterName
+                            VM                                   = $vm.Name
+                            PowerState                           = $vm.PowerState
+                            NumCpu                               = $vm.NumCpu
+                            MemoryGB                             = $vm.MemoryGB
+                            ProvisionedSpaceGB                   = [Math]::Round($vm.ProvisionedSpaceGB, 2)
+                            UsedSpaceGB                          = [Math]::Round($vm.UsedSpaceGB, 2) # Used space on the datastore.
+                            "Individual Hard Disk sizes (GB)"    = $HardDiskSizes
+                            "Volume/Partition : Capacity : Free" = $Partitions
+                            GuestId                              = $vm.ExtensionData.Summary.Guest.GuestId
+                            GuestOsFullName                      = $vm.ExtensionData.Summary.Guest.GuestFullName
+                            GuestName                            = $vm.ExtensionData.Guest.Hostname
+                            ToolsStatus                          = $vm.ExtensionData.Summary.Guest.ToolsStatus
+                            "IP Address(es)"                     = $ipList
+                            "MAC Addresses"                      = $Macs
+                            "NIC Connection State"               = $NICState
+                            "NIC Type"                           = $NICType
+                            "Portgroup name"                     = $pg
+                            ToolsVersion                         = $vm.ExtensionData.Config.Tools.ToolsVersion
+                            MemoryHotAdd                         = $vm.ExtensionData.Config.MemoryHotAddEnabled
+                            CPUHotAdd                            = $vm.ExtensionData.Config.CPUHotAddEnabled
+                            "VM Hardware version"                = $vm.ExtensionData.Config.Version
+                            Host                                 = $ESXiHost.name
+                            Version                              = $ESXiHost.Version
+                            Build                                = $ESXiHost.Build    
                         }   
 
-                        # Put VM performance related metrics into a separate custom object, so that we can populate a separate worksheet
-                        $VMPerfInfo = [PSCustomObject]@{
-                            VM                         = $vm.Name
-                            PowerState                 = $vm.PowerState
-                            MemoryReservation          = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Reservation
-                            MemoryLimit                = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Limit
-                            CPUReservation             = $vm.ExtensionData.ResourceConfig.CPUAllocation.Reservation
-                            CPULimit                   = $vm.ExtensionData.ResourceConfig.CPUAllocation.Limit
-                            Ballooning                 = $vm.ExtensionData.Summary.QuickStats.BalloonedMemory
-                            "Avg CPU Usage (Mhz)"      = $vmCPU
-                            "Avg Memory Usage (%)"     = $vmMem
-                            "Avg Network Usage (KBps)" = $vmNet
-                            "Avg Disk Usage (KBps)"    = $vmDisk
-                        } # end $VMPerfInfo = [PSCustomObject]@
+                        If ($Performance -eq "Yes") {
+                            # Calculate 30 day averages for memory, cpu, network and disk metrics, only for VMs powered on - otherwise set value to 0
+                            # If we don't, we'll see lots of errors as it reports that it can't get the metric, and the respective cells in the worksheet
+                            # would be left blank.
+                            If ($vm.powerstate -eq "PoweredOn") {
+                                $vmCPU = [Math]::Round(($vm | Get-Stat -Stat cpu.usagemhz.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                                $vmMem = [Math]::Round(($vm | Get-Stat -Stat mem.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                                $vmNet = [Math]::Round(($vm | Get-Stat -Stat net.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                                $vmDisk = [Math]::Round(($vm | Get-Stat -Stat disk.usage.average -Start (Get-Date).AddDays($TP) -IntervalMins 5 | Measure-Object Value -Average).Average, 2)
+                            } else {
+                                $vmCPU = 0
+                                $vmMem = 0
+                                $vmNet = 0
+                                $vmDisk = 0
+                            }
+
+                            # Put VM performance related metrics into a separate custom object, so that we can populate a separate worksheet
+                            $VMPerfInfo = [PSCustomObject]@{
+                                VM                         = $vm.Name
+                                PowerState                 = $vm.PowerState
+                                MemoryReservation          = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Reservation
+                                MemoryLimit                = $vm.ExtensionData.ResourceConfig.MemoryAllocation.Limit
+                                CPUReservation             = $vm.ExtensionData.ResourceConfig.CPUAllocation.Reservation
+                                CPULimit                   = $vm.ExtensionData.ResourceConfig.CPUAllocation.Limit
+                                Ballooning                 = $vm.ExtensionData.Summary.QuickStats.BalloonedMemory
+                                "Avg CPU Usage (Mhz)"      = $vmCPU
+                                "Avg Memory Usage (%)"     = $vmMem
+                                "Avg Network Usage (KBps)" = $vmNet
+                                "Avg Disk Usage (KBps)"    = $vmDisk
+                            }  
+                        } # end If ($Performance -eq "Yes")
 
                         # Create customm object for each harddisk on the VM giving its size and the datastore in which it resides.
                         # This will all go in the VM disks worksheet
@@ -692,13 +721,26 @@ function Get-EnvironmentReport {
                 foreach ($snap in Get-VM -Location $dc | Get-Snapshot) {
                     $ds = Get-Datastore -VM $snap.vm
                     $SnapshotAge = ((Get-Date) - $snap.Created).Days
-                
+
+                        # who's the culprit?
+                        $snapshotEvent = Get-VIEvent -Entity $snap.VM -Types Info -Finish $snap.Created.AddMinutes(10) | Where-Object {$_.FullFormattedMessage -imatch 'Task: Create virtual machine snapshot'}
+                        if ($snapshotEvent -ne $null) {
+                            If ($snapshotEvent.count -gt 1) {
+                                # Just in case there are multiple events, get the latest one.
+                                $SnapshotEvent = $SnapshotEvent | Sort-Object -Property CreatedTime | Select-Object -Last 1 
+                            }
+                            $CreatedBy = $SnapshotEvent.Username
+                        } else {
+                            $CreatedBy = "Unknown" # ok, can't figure an entry - maybe the snap is so old it's rotated out, or maybe the script logic has failed.
+                        }
+                    
                     $snapinfo = [PSCustomObject]@{
                         "vCenter"                   = $vcName
                         "VM"                        = $snap.vm
                         "Snapshot Name"             = $snap.name
                         "Description"               = $snap.description
                         "Created"                   = $snap.created
+                        "Created by"                = $CreatedBy
                         "Snapshot age (days)"       = $SnapshotAge
                         "Snapshot size (GB)"        = [math]::round($snap.sizeGB)
                         "Datastore"                 = $ds[0].name
@@ -739,10 +781,13 @@ function Get-EnvironmentReport {
                 }
                 $a.save()
                 $a.dispose()
-                $VMPerfCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Performance" -AutoSize
                 $vmHardDiskCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Disks" -Autosize
                 $rdmCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "RDMs" -Autosize
                 $AllDRSRules | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "DRS Rules" -Autosize
+                If ($Performance -eq "Yes") {
+                    $VMPerfCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VM Performance" -AutoSize
+                }
+
             } else {
                 $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize
             }
@@ -774,15 +819,17 @@ function Get-EnvironmentReport {
             $VMCollection | Export-CSV -NoTypeInformation -Path $VM_csv
             Write-Host "VM audit : $vm_csv" -ForegroundColor Green    
             If ($ReportType -eq "Detailed") {
-                $vmperf_csv = "$script_dir\$VCName-VMPerf-Audit-$date.csv" 
-                $VMPerfCollection | Export-CSV -NoTypeInformation -Path $VMPerf_csv
-                Write-Host "VM performance audit : $vmPerf_csv" -ForegroundColor Green  
                 $vmDisks_csv = "$script_dir\$VCName-VMDisks-Audit-$date.csv" 
                 $vmHardDiskCollection | Export-CSV -NoTypeInformation -Path $VMDisks_csv
                 Write-Host "VM disks audit : $vmDisks_csv" -ForegroundColor Green  
                 $rdm_csv = "$script_dir\$VCName-RDMs-Audit-$date.csv" 
                 $rdmCollection | Export-CSV -NoTypeInformation -Path $rdm_csv
                 Write-Host "RDMs audit : $rdm_csv" -ForegroundColor Green  
+                If ($Performance -eq "Yes") {
+                    $vmperf_csv = "$script_dir\$Customer-$VCName-$Ticket-VMPerf-Audit-$date.csv" 
+                    $VMPerfCollection | Export-CSV -NoTypeInformation -Path $VMperf_csv
+                    Write-Host "VM Performance audit : $vm_csv" -ForegroundColor Green      
+                }
             }
         }
         If ($Hosts -eq "Yes") { 

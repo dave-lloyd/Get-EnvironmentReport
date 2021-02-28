@@ -32,7 +32,8 @@ The core options are as follows. If you export as Excel, each of these will be a
     Guest Name - guestname at the OS level - requires that VMwareTools be running.
 
 ### VMs - Information included for "Detailed" report type - all the info in the Summary option, plus the following :
-    Individual Hard Disk sizes (GB) - the size of the individual harddisks as presented to the VM.
+    Individual Hard Disk sizes (GB) - the size of the harddisks presented to the VM.
+    Volume/Partition : Capacity : Free - disk usage at the OS level. Requires VMwareTools be running. All volumes/partitions in a single cell.
     IP Address(es) - requires VMwareTools be running. 
     MAC Addresses 
     NIC Connection State
@@ -48,7 +49,7 @@ The core options are as follows. If you export as Excel, each of these will be a
     Host version number
     Host build number
 
-### VM Performance - only produced if "Detailed" report type is selected :
+### VM Performance - only produced if "Detailed" report type is selected AND "Performance" equals Yes. Treat with caution.
     VM Name
     Powerstate
     MemoryReservation - whether VM has a memory reservation and if so, what size. No reservation = 0
@@ -141,6 +142,17 @@ You should probably treat this information with caution, given the sample rate a
     VMFS version
     NAA 
     ProvisionedGB - view to see if overprovisioned due to thin provisioning.
+
+### Snapshots - Information included :
+    VM 
+    Snapshot name 
+    Description 
+    Date created 
+    Created By - will be marked as "unknown" if unable to find a matching event.
+    Snapshot age 
+    Snapshot size 
+    Datastore 
+    Datastore free space 
 
 ## Credentials required
 An account with the Read-only role is sufficient for this script.
