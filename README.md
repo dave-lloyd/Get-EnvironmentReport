@@ -129,6 +129,20 @@ You should probably treat this information with caution, given the sample rate a
     FT - whether enabled for Fault Tolerance logging - TRUE or FALSE
     VSAN - whether enabled for VSAN - TRUE or FALSE
 
+### vss Portgroups - only produced if hosts and "detailed" report type are selected.
+    Host
+    Portgroup Name
+    Virtual Switch 
+    VLAN ID
+
+### vds Portgroups - only produced if hosts and "detailed" report type are selected.
+    Host
+    Portgroup Name
+    Virtual Switch 
+    Uplink
+    VLAN ID
+    PVLAN ID
+
 ### Datastores - Information included for "Summary" report type :
     Datastore name 
     Capacity 

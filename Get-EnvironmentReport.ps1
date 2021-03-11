@@ -182,6 +182,20 @@ function Get-EnvironmentReport {
             FT - whether enabled for Fault Tolerance logging - TRUE or FALSE
             VSAN - whether enabled for VSAN - TRUE or FALSE
 
+         vss Portgroups - only produced if hosts and "detailed" report type are selected.
+            Host
+            Portgroup Name
+            Virtual Switch 
+            VLAN ID
+
+         vds Portgroups - only produced if hosts and "detailed" report type are selected.
+            Host
+            Portgroup Name
+            Virtual Switch 
+            Uplink
+            VLAN ID
+            PVLAN ID
+
          Datastores - Information included for "Summary" report type :
             Datastore name 
             Capacity 
@@ -316,6 +330,8 @@ function Get-EnvironmentReport {
     $snapshotCollection = @() # Snapshots worksheet collection
     $rdmCollection = @() # RDMs worksheet collection
     $vmkCollection = @() # ESXi vmks
+    $vssportgroupCollection = @() # Standard vSwitch portgroup collection
+    $vdsportgroupCollection = @() # vDS portgroup collection
 
     # Now for the work - work against VC 
     foreach ($vc in $vCenter) {
@@ -487,6 +503,44 @@ function Get-EnvironmentReport {
                             $vmkCollection += $vmkInfo
                         } # end forEach ($vmk in $hostvmk) 
 
+                        # Gather portgroup info for standard switches
+                        foreach ($vsspg in $ESXiHost | get-virtualswitch -standard | get-virtualportgroup) {
+                            $vsspgInfo = [PSCustomObject]@{
+                                "Host"            = $ESXiHost.name
+                                "Portgroup Name"  = $vsspg.name
+                                "Virtual switch"  = $vsspg.virtualswitch
+                                "VLAN ID"         = $vsspg.vlanid    
+                            } 
+                            $vssportgroupCollection += $vsspginfo
+                        }
+
+                        # Gather portgroup info for distributed switches
+                        foreach ($vdspg in $ESXiHost | get-vdswitch | get-virtualportgroup) {
+                            If ($vdspg.name -like "*uplink*") {
+                                $uplink = "Uplink"
+                                $vlanID = ""
+                            } else {
+                                $vlanID = $vdspg.ExtensionData.Config.DefaultPortConfig.Vlan.VlanId
+                                $uplink = ""
+                            }
+                            
+                            If ($vdspg.ExtensionData.Config.DefaultPortConfig.Vlan -is [VMware.Vim.VmwareDistributedVirtualSwitchPvlanSpec]){
+                                $pvlanID = $vdspg.ExtensionData.Config.DefaultPortConfig.Vlan.PvlanId
+                            } else {
+                                $pvlanID = ""
+                            }
+
+                            $vdspgInfo = [PSCustomObject]@{
+                                "Host"            = $ESXiHost.name
+                                "Portgroup Name"  = $vdspg.name
+                                "Virtual switch"  = $vdspg.virtualswitch.name
+                                "Uplink"          = $uplink
+                                "VLAN ID"         = $vlanID
+                                "PVLAN ID"        = $pvlanID
+                            }
+                            $vdsportgroupCollection += $vdspginfo
+                        }
+                    
                     } # end If (ReportType -eq "Summary")
                     $ESXiCollection += $ESXinfo
 
@@ -798,6 +852,9 @@ function Get-EnvironmentReport {
                 $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize             
                 $ESXiNICCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi NICs" -AutoSize     
                 $vmkCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi vmks" -AutoSize     
+                $vssportgroupCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "vss Portgroups" -AutoSize
+                $vdsportgroupCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "vDS Portgroups" -AutoSize
+
             } else {
                 $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize             
             }
@@ -836,6 +893,23 @@ function Get-EnvironmentReport {
             $ESXiHosts_csv = "$script_dir\$VCName-ESXi-Hosts-Audit-$date.csv" 
             $ESXiCollection | Export-CSV -NoTypeInformation -Path $ESXiHosts_csv   
             Write-Host "ESXi Hosts audit : $ESXiHosts_csv" -ForegroundColor Green    
+
+            $ESXiNICS_csv = "$script_dir\$VCName-ESXi-Hosts-Audit-$date.csv" 
+            $ESXiNICCollection | Export-CSV -NoTypeInformation -Path $ESXiNICS_csv   
+            Write-Host "ESXi NICs audit : $ESXiNICS_csv" -ForegroundColor Green    
+
+            $ESXivmk_csv = "$script_dir\$VCName-ESXi-vmks-Audit-$date.csv" 
+            $vmkCollection | Export-CSV -NoTypeInformation -Path $ESXivmk_csv   
+            Write-Host "ESXi vmks audit : $ESXivmk_csv" -ForegroundColor Green    
+
+            $vssportgroups_csv = "$script_dir\$VCName-ESXi-vss-portgroups-Audit-$date.csv" 
+            $vssportgroupCollection | Export-CSV -NoTypeInformation -Path $vssportgroups_csv   
+            Write-Host "ESXi Hosts audit : $vssportgroups_csv" -ForegroundColor Green    
+
+            $vdsportgroups_csv = "$script_dir\$VCName-ESXi-vds-portgroups-Audit-$date.csv" 
+            $vdsportgroupCollection | Export-CSV -NoTypeInformation -Path $vdsportgroups_csv   
+            Write-Host "ESXi Hosts audit : $vdsportgroups_csv" -ForegroundColor Green    
+
         }
         If ($Datastores -eq "Yes") { 
             $Datastore_csv = "$script_dir\$VCName-Datastore-Audit-$date.csv" 
