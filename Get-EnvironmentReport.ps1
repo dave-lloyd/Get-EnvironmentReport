@@ -504,7 +504,7 @@ function Get-EnvironmentReport {
                         } # end forEach ($vmk in $hostvmk) 
 
                         # Gather portgroup info for standard switches
-                        foreach ($vsspg in $ESXiHost | get-virtualswitch -standard | get-virtualportgroup) {
+                        foreach ($vsspg in $ESXiHost | get-virtualswitch -standard | get-virtualportgroup -Standard) {
                             $vsspgInfo = [PSCustomObject]@{
                                 "Host"            = $ESXiHost.name
                                 "Portgroup Name"  = $vsspg.name
@@ -515,7 +515,7 @@ function Get-EnvironmentReport {
                         }
 
                         # Gather portgroup info for distributed switches
-                        foreach ($vdspg in $ESXiHost | get-vdswitch | get-virtualportgroup) {
+                        foreach ($vdspg in $ESXiHost | get-vdswitch | Get-VDPortgroup) {
                             If ($vdspg.name -like "*uplink*") {
                                 $uplink = "Uplink"
                                 $vlanID = ""
@@ -533,7 +533,7 @@ function Get-EnvironmentReport {
                             $vdspgInfo = [PSCustomObject]@{
                                 "Host"            = $ESXiHost.name
                                 "Portgroup Name"  = $vdspg.name
-                                "Virtual switch"  = $vdspg.virtualswitch.name
+                                "Virtual switch"  = $vdspg.vdSwitch.Name
                                 "Uplink"          = $uplink
                                 "VLAN ID"         = $vlanID
                                 "PVLAN ID"        = $pvlanID
