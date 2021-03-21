@@ -78,6 +78,30 @@ function Get-EnvironmentReport {
          The amount of information reported is determined by the ReportType parameter. The "Detailed" option generates the full report, and the "Summary" option is a subset of this. This applies to the properties reported in the VMs worksheet. 
          You can of course choose "Detailed" even for a summary report and just remove a few columns if they are not required.
 
+         VCs
+            Name
+            Version
+            Build
+            
+         Clusters 
+            Cluster
+            Overall status
+            Configuration status
+            HA Enabled  
+            HA Admission control
+            HA restart priority 
+            HA isolation response
+            DRS
+            DRS mode
+            DRS automation level
+            Number vMotions
+            vSAN enabled
+            Number hosts
+            CPU Cores
+            CPU threads
+            VM Count
+            Powered off VM count
+
          VMs - Information included for "Summary" report type :
             VM 
             Powerstate
@@ -235,6 +259,8 @@ function Get-EnvironmentReport {
          The IP/FQDN of the VC to audit.
         .PARAMETER VMs
          Whether or not to include VMs in the audit.
+        .PARAMETER Clusters
+         Whether or not to include clusters in the audit.
         .PARAMETER Hosts
          Whether or not to include ESXi hosts in the audit.
         .PARAMETER Datastores
@@ -251,14 +277,14 @@ function Get-EnvironmentReport {
         .PARAMETER Performance
          Whether to include "performance" data and worksheet if VMs are selected. This will increase the time for the script to run not insignificantly.
         .EXAMPLE
-         The following example will connect to VC 10.10.10.10 and generate an .xlsx file Named 10.10.10.10-Audit-<date>.xlsx which contains worksheets for VMs and performance, ESXi hosts and Datastores
-         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details -Performance Yes    
+         The following example will connect to VC 10.10.10.10 and generate an .xlsx file Named 10.10.10.10-Audit-<date>.xlsx which contains worksheets for Clusters, VMs and performance, ESXi hosts and Datastores
+         Get-EnvironmentReport -vCenter 10.10.10.10 -Clusters Yes -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details -Performance Yes    
         .EXAMPLE
          The following example will connect to VC 10.10.10.10 and generate an .xlsx file Named 10.10.10.10-Audit-<date>.xlsx which contains worksheets for VMs with no performance metrics, ESXi hosts and Datastores
-         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details -Performance No    
+         Get-EnvironmentReport -vCenter 10.10.10.10 -Clusters No  -VMs Yes -Hosts Yes -Datastores Yes -Snapshots No -OutputFormat Excel -ReportType Details -Performance No    
         .EXAMPLE
-         The following example will connect to VC 10.10.10.10 and generate a series of .csv files, one each containing an audit of VMs, ESXi hosts, Datastores and Snapshots in the environment. 
-         Get-EnvironmentReport -vCenter 10.10.10.10 -VMs Yes -Hosts Yes -Datastores Yes -Snapshots Yes -OutputFormat CSV -ReportType Summary -Performance No
+         The following example will connect to VC 10.10.10.10 and generate a series of .csv files, one each containing an audit of VMs, Clusters, ESXi hosts, Datastores and Snapshots in the environment. 
+         Get-EnvironmentReport -vCenter 10.10.10.10 -Clusters Yes -VMs Yes -Hosts Yes -Datastores Yes -Snapshots Yes -OutputFormat CSV -ReportType Summary -Performance No
               
         .NOTES
         Author          : Dave Lloyd
@@ -270,6 +296,10 @@ function Get-EnvironmentReport {
         [Parameter(Mandatory = $True, Position = 1)]
         [string]$vCenter,
         
+        [Parameter(Mandatory = $True)]
+        [ValidateSet('Yes', 'No')] # these are the only valid options
+        [string]$Clusters,
+
         [Parameter(Mandatory = $True)]
         [ValidateSet('Yes', 'No')] # these are the only valid options
         [string]$VMs,
@@ -332,6 +362,9 @@ function Get-EnvironmentReport {
     $vmkCollection = @() # ESXi vmks
     $vssportgroupCollection = @() # Standard vSwitch portgroup collection
     $vdsportgroupCollection = @() # vDS portgroup collection
+    $vcCollection = @() # vCenter collection
+    $clusterCollection = @()
+
 
     # Now for the work - work against VC 
     foreach ($vc in $vCenter) {
@@ -348,6 +381,39 @@ function Get-EnvironmentReport {
     
         $VCName = $global:DefaultVIServer.name
     
+        $vcInfo = [PSCustomObject]@{
+            "vCenter" = $global:DefaultVIServer.Name
+            "Version" = $global:DefaultVIServer.version
+            "Build"   = $global:DefaultVIServer.build
+        }
+        $vcCollection += $vcInfo
+
+        If ($Clusters -eq "Yes") {
+        Write-Host "`nProcessing cluster infomation." -ForegroundColor Green
+            forEach ($clus in Get-Cluster) {
+                $clusterInfo = [PSCustomObject]@{
+                    "Cluster"               = $clus.name
+                    "Overall status"        = $clus.ExtensionData.Configstatus
+                    "Configuration status"  = $clus.ExtensionData.Overallstatus
+                    "HA Enabled"            = $clus.HAEnabled  
+                    "HA Admission control"  = $clus.HAAdmissionControlEnabled
+                    "HA restart priority "  = $clus.HARestartPriority
+                    "HA isolation response" = $clus.HAIsolationResponse
+                    "DRS"                   = $clus.DrsEnabled
+                    "DRS mode"              = $clus.DrsMode
+                    "DRS automation level"  = $clus.DrsAutomationLevel
+                    "Number vMotions"       = $clus.ExtensionData.Summary.NumvMotions
+                    "vSAN enabled"          = $clus.VsanEnabled
+                    "Number hosts"          = $clus.ExtensionData.Summary.NumHosts
+                    "CPU Cores"             = $clus.ExtensionData.Summary.Numcpucores
+                    "CPU threads"           = $clus.ExtensionData.Summary.Numcputhreads
+                    "VM Count"              = $clus.ExtensionData.Summary.usageSummary.Totalvmcount
+                    "Powered off VM count"  = $clus.ExtensionData.Summary.usageSummary.Poweredoffvmcount
+                }
+                $clusterCollection += $clusterInfo
+            }
+        } # end If ($Clusters -eq "Yes") 
+
         $dcs = Get-Datacenter 
         foreach ($dc in $dcs) {
             # Gather the information for the Datastores worksheet              
@@ -560,6 +626,7 @@ function Get-EnvironmentReport {
                     $ClusTemp = $vm | Get-VMHost
                     $clusterName = $ClusTemp.Parent.Name
 
+
                     # Collect the following only if $ReportType is detailed
                     If ($ReportType -eq "Detailed") {
                         # List the size of individual hard disks
@@ -767,6 +834,8 @@ function Get-EnvironmentReport {
                     $VMPerfCollection += $VMPerfInfo
 
                 } # end foreach ($vm in $allVMs)
+
+
             } # end If ($VMs -eq "Yes")
 
             # Gather the information for the Snapshots worksheet              
@@ -815,6 +884,11 @@ function Get-EnvironmentReport {
     If ($OutputFormat -eq "Excel") {
         # Generate the worksheets in the .xlsx - relies on the ImportExcel module from the start of the script.
         $xlsx_output_file = "$script_dir\$VCName-Audit-$date.xlsx"
+        $vcCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "VC" -Autosize
+
+        If ($Clusters -eq "Yes") {
+            $clusterCollection | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "Clusters" -Autosize
+        }
 
         If ($vms -eq "Yes") { 
             If ($ReportType -eq "Detailed") {
@@ -823,11 +897,12 @@ function Get-EnvironmentReport {
                 # Also then doing a vertical alignment of the other columns to top - this is my preference.
                 $a = $VMCollection | Sort-Object -Property Cluster, VM | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname VMs -AutoSize -PassThru
                 $a.workbook.Worksheets["VMs"].Column(10).Style.Wraptext = $true
-                $a.workbook.Worksheets["VMs"].Column(15).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(11).Style.Wraptext = $true
                 $a.workbook.Worksheets["VMs"].Column(16).Style.Wraptext = $true
                 $a.workbook.Worksheets["VMs"].Column(17).Style.Wraptext = $true
                 $a.workbook.Worksheets["VMs"].Column(18).Style.Wraptext = $true
                 $a.workbook.Worksheets["VMs"].Column(19).Style.Wraptext = $true
+                $a.workbook.Worksheets["VMs"].Column(20).Style.Wraptext = $true
                 foreach ($c in 1..27) {
                     # Set vertical alignment for each column to top. For ease, doing this for columns 1 -> 26. There will be a more "correct" way to do this.
                     $a.workbook.Worksheets["VMs"].Column($c).Style.VerticalAlignment = "Top"
@@ -871,6 +946,13 @@ function Get-EnvironmentReport {
         Write-Host "`nAudit generated in $xlsx_output_file" -ForegroundColor Green
     } else {
         # Output form must be .csv so generate files for each that were selected.
+        If ($Clusters -eq "Yes") {
+            $clusters_csv = "$script_dir\$VCName-Clusters-Audit-$date.csv" 
+            $clusterCollection | Export-CSV -NoTypeInformation -Path $clusters_csv
+            Write-Host "Clusters audit : $clusters_csv" -ForegroundColor Green    
+
+        }
+
         If ($vms -eq "Yes") { 
             $vm_csv = "$script_dir\$VCName-VM-Audit-$date.csv" 
             $VMCollection | Export-CSV -NoTypeInformation -Path $VM_csv

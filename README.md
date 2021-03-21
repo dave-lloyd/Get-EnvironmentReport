@@ -16,11 +16,43 @@ Help Get-EnvironmentReport -full
 
 ## Options :
 The core options are as follows. If you export as Excel, each of these will be a worksheet in the final spreadsheet. If you export as CSV, then these would be the individual CSV files :
+- VCs
+- Clusters
 - VMs
+- VM disks
+- RDMs
+- VM performance
 - ESXi Hosts
+- ESXi NICs
+- ESXi vmks
+- vss portgroups
+- vds portgroups
 - Datastores
 - Snapshots
 
+### VCs
+    Name
+    Version
+    Build
+            
+### Clusters 
+    Cluster
+    Overall status
+    Configuration status
+    HA Enabled  
+    HA Admission control
+    HA restart priority 
+    HA isolation response
+    DRS
+    DRS mode
+    DRS automation level
+    Number vMotions
+    vSAN enabled
+    Number hosts
+    CPU Cores
+    CPU threads
+    VM Count
+    Powered off VM count
 
 ### VMs - Information included for "Summary" report type :
     VM name
@@ -86,7 +118,6 @@ You should probably treat this information with caution, given the sample rate a
     Rule type - affinitiy/anti-affinity/VM host affinity
     VMs
             
-
 ### ESXi hosts - Information included for "Summary" report type :
     Host name 
     Connection state 
