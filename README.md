@@ -174,6 +174,17 @@ You should probably treat this information with caution, given the sample rate a
     VLAN ID
     PVLAN ID
 
+### CDP - only produced if hosts and "detailed" report type are selected.
+    Hostname
+    VMNIC
+    Speed
+    PCI
+    Port
+    NetworkSwitch
+    CDP_Address
+    VLAN
+    SwitchType
+
 ### Datastores - Information included for "Summary" report type :
     Datastore name 
     Capacity 

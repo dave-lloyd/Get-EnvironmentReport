@@ -220,6 +220,17 @@ function Get-EnvironmentReport {
             VLAN ID
             PVLAN ID
 
+         CDP - only produced if hosts and "detailed" report type are selected.
+            Hostname
+            VMNIC
+            Speed
+            PCI
+            Port
+            NetworkSwitch
+            CDP_Address
+            VLAN
+            SwitchType
+
          Datastores - Information included for "Summary" report type :
             Datastore name 
             Capacity 
@@ -364,6 +375,7 @@ function Get-EnvironmentReport {
     $vdsportgroupCollection = @() # vDS portgroup collection
     $vcCollection = @() # vCenter collection
     $clusterCollection = @()
+    $CDPCollection = @()
 
 
     # Now for the work - work against VC 
@@ -606,7 +618,34 @@ function Get-EnvironmentReport {
                             }
                             $vdsportgroupCollection += $vdspginfo
                         }
-                    
+                        
+                        # Gather CDP information if it's available - https://kb.vmware.com/s/article/1007069
+                        $esxiHost | ForEach-Object { Get-View $_.ID } |
+                        ForEach-Object { $esxname = $_.Name; Get-View $_.ConfigManager.NetworkSystem } |
+                        ForEach-Object { foreach ($physnic in $_.NetworkInfo.Pnic) {
+                                $CDPobject = "" | Select-Object Hostname, VMNIC, Speed, PCI, Port, NetworkSwitch, CDP_Address, VLAN, SwitchType
+
+                                $pnicInfo = $_.QueryNetworkHint($physnic.Device)
+                                foreach ($hint in $pnicInfo) {
+                                    $CDPobject.Hostname = $esxname
+                                    $CDPobject.VMNIC = $physnic.Device
+                                    $CDPobject.Speed = $physnic.LinkSpeed.SpeedMb
+                                    $CDPobject.PCI = $physnic.PCI
+                                    if ( $hint.ConnectedSwitchPort ) {
+                                        $CDPobject.Port = $hint.ConnectedSwitchPort.PortId
+                                    }
+                                    else {
+                                        $CDPobject.Port = "No CDP information available."
+                                    }
+                                    $CDPobject.NetworkSwitch = $hint.ConnectedSwitchPort.DevId
+                                    $CDPobject.CDP_Address = $hint.ConnectedSwitchPort.Address
+                                    $CDPobject.VLAN = $hint.ConnectedSwitchPort.VLAN
+                                    $CDPobject.SwitchType = $hint.ConnectedSwitchPort.HardwarePlatform
+                                }
+                                $CDPCollection += $CDPobject
+                            }
+                        } # end ForEach-Object { foreach ...
+
                     } # end If (ReportType -eq "Summary")
                     $ESXiCollection += $ESXinfo
 
@@ -929,7 +968,7 @@ function Get-EnvironmentReport {
                 $vmkCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi vmks" -AutoSize     
                 $vssportgroupCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "vss Portgroups" -AutoSize
                 $vdsportgroupCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "vDS Portgroups" -AutoSize
-
+                $CDPCollection | Sort-Object -Property Host | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "CDP" -AutoSize     
             } else {
                 $ESXiCollection | Sort-Object -Property Hypervizor | Export-Excel $xlsx_output_file -BoldTopRow -AutoFilter -FreezeTopRow -WorkSheetname "ESXi hosts" -AutoSize             
             }
@@ -990,7 +1029,12 @@ function Get-EnvironmentReport {
 
             $vdsportgroups_csv = "$script_dir\$VCName-ESXi-vds-portgroups-Audit-$date.csv" 
             $vdsportgroupCollection | Export-CSV -NoTypeInformation -Path $vdsportgroups_csv   
-            Write-Host "ESXi Hosts audit : $vdsportgroups_csv" -ForegroundColor Green    
+            Write-Host "ESXi Hosts audit : $vdsportgroups_csv" -ForegroundColor Green   
+            
+            $CDP_csv = "$script_dir\$Customer-$VCName-$Ticket-ESXi-CDP-Audit-$date.csv" 
+            $CDPCollection | Export-CSV -NoTypeInformation -Path $CDP_csv   
+            Write-Host "ESXi CDP audit : $CDP_csv" -ForegroundColor Green    
+
 
         }
         If ($Datastores -eq "Yes") { 
