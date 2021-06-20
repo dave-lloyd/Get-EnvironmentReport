@@ -558,6 +558,7 @@ function Get-EnvironmentReport {
                                 Description   = $HostNIC.Description
                                 "Link status" = $HostNIC.Link
                                 "Link Speed"  = $HostNIC.Speed
+                                "Duplex"      = $HostNIC.duplex
                                 "Driver type" = $HostNIC.Driver
                                 "MTU"         = $HostNIC.mtu 
 
