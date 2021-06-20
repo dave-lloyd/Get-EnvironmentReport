@@ -470,8 +470,11 @@ function Get-EnvironmentReport {
             If ($Hosts -eq "Yes") {
                 Write-Host "`nProcessing Hosts information in datacenter : $dc." -ForegroundColor Green
                 $allESXiHosts = Get-VMHost -Location $dc
+                $hostcount = $allESXiHosts.count
 
                 foreach ($ESXiHost in $allESXiHosts) {        
+                    write-progress -id 1 -activity "Gathering host info for :" -status  "$ESXiHost" -PercentComplete (($hostprocessed/$hostcount)*100)
+                    $hostprocessed = $hostprocessed +1
 
                     $VMsPerHost = $ESXiHost | Get-VM
                     if ($ESXiHost.IsStandalone) { $clusterName = 'Standalone' } else { $clusterName = $ESXiHost.Parent.Name }				
@@ -652,19 +655,23 @@ function Get-EnvironmentReport {
                 } # end foreach ($ESXiHost in $allESXiHosts)
             } # end If ($Hosts -eq "Yes")
 
-            # Gather the information for the VMs worksheet              
+            # Gather the information for the VMs worksheet     
+            
             If ($VMs -eq "Yes") {
                 Write-Host "`nProcessing VMs information in datacenter : $dc." -ForegroundColor Green
 
                 $allVMs = get-vm -Location $dc
+                $vmcount = $allVMs.Count
+
                 foreach ($vm in $allVMs) {
+                    write-progress -id 1 -activity "Gathering VM info for :" -status  "$vm" -PercentComplete (($processed/$vmcount)*100)
+                    $processed = $processed +1
 
                     $ESXiHost = $vm | Get-VMHost    
                     if ($ESXiHost.IsStandalone) { $clusterName = 'Standalone' } else { $clusterName = $ESXiHost.Parent.Name }				
                     
                     $ClusTemp = $vm | Get-VMHost
                     $clusterName = $ClusTemp.Parent.Name
-
 
                     # Collect the following only if $ReportType is detailed
                     If ($ReportType -eq "Detailed") {
